@@ -22,9 +22,13 @@ fn main() {
     syntax::debug(&syntax);
 
     let (mut semantic, mut types) = semantic::parse(&source, &tokens, &syntax);
-    semantic::infer_types(&mut semantic, &mut types);
 
     debug_header("SEMANTIC");
+    semantic::debug(&semantic, &types);
+
+    semantic::infer_types(&mut semantic, &mut types);
+
+    debug_header("TYPED SEMANTIC");
     semantic::debug(&semantic, &types);
 
     let ssa = ssa::generate(&source, &tokens, &semantic, &mut types);
