@@ -1,0 +1,7 @@
+[package]
+name = "keb"
+edition = "2024"
+
+[dependencies]
+unicode-ident = "1.0.18"
+colored = "3.0.0"

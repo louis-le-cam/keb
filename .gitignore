@@ -1,0 +1,7 @@
+# Rust artifacts
+/target/
+/Cargo.lock
+
+# Compiler outputs
+/a.out
+/output.c
