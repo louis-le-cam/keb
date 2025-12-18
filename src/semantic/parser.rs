@@ -1,8 +1,7 @@
 use crate::{
     key_vec::{Sentinel, Val},
     semantic::{
-        self, Node, NodeData, NodeKind, NodeSentinel, Nodes, Type, TypeData, TypeSentinel, Types,
-        combine_types,
+        self, Node, NodeData, NodeKind, Nodes, Type, TypeData, TypeSentinel, Types, combine_types,
     },
     syntax::{self, Syn, SynData, Syns},
     token::{self, Tokens},

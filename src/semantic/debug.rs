@@ -2,7 +2,7 @@ use colored::Colorize as _;
 
 use crate::{
     key_vec::Val,
-    semantic::{Node, NodeKind, NodeSentinel, Nodes, ROOT_NODE, TypeSentinel, Types},
+    semantic::{Node, NodeKind, Nodes, ROOT_NODE, TypeSentinel, Types},
 };
 
 pub fn debug(nodes: &Nodes, types: &Types) {
