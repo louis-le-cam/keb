@@ -23,7 +23,7 @@ pub enum SynData {
     Curly(Syn),
     Tuple(Vec<Syn>),
     Application { function: Syn, argument: Syn },
-    Chain(Vec<Syn>),
+    ChainOpen(Vec<Syn>),
     ChainClosed(Vec<Syn>),
 }
 

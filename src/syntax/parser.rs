@@ -72,7 +72,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         Some(self.syns.push(if closed {
             SynData::ChainClosed(syns)
         } else {
-            SynData::Chain(syns)
+            SynData::ChainOpen(syns)
         }))
     }
 

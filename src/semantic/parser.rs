@@ -1,7 +1,8 @@
 use crate::{
     key_vec::{Sentinel, Val},
     semantic::{
-        self, Node, NodeData, NodeKind, Nodes, Type, TypeData, TypeSentinel, Types, combine_types,
+        self, Node, NodeData, NodeKind, NodeSentinel, Nodes, Type, TypeData, TypeSentinel, Types,
+        combine_types,
     },
     syntax::{self, Syn, SynData, Syns},
     token::{self, Tokens},
@@ -177,6 +178,22 @@ impl Parser<'_> {
                     let ty = self.parse_type(*type_);
                     self.add_type(expression, ty);
                     expression
+                }
+                SynData::ChainOpen(syns) => {
+                    let statements = syns
+                        .iter()
+                        .take(syns.len() - 1)
+                        .map(|syn| self.parse_expression(*syn))
+                        .collect();
+                    let expression = self.parse_expression(*syns.last().unwrap());
+                    self.push(NodeKind::ChainOpen {
+                        statements,
+                        expression,
+                    })
+                }
+                SynData::ChainClosed(syns) => {
+                    let statements = syns.iter().map(|syn| self.parse_expression(*syn)).collect();
+                    self.push(NodeKind::ChainClosed { statements })
                 }
                 expr => panic!("{expr:?}"),
             },

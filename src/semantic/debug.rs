@@ -2,7 +2,7 @@ use colored::Colorize as _;
 
 use crate::{
     key_vec::Val,
-    semantic::{Node, NodeKind, Nodes, ROOT_NODE, TypeSentinel, Types},
+    semantic::{Node, NodeKind, NodeSentinel, Nodes, ROOT_NODE, TypeSentinel, Types},
 };
 
 pub fn debug(nodes: &Nodes, types: &Types) {
@@ -69,6 +69,24 @@ impl std::fmt::Debug for DebugNode<'_> {
                     .fold(
                         &mut f.debug_struct("build_struct".bright_green().to_string().as_str()),
                         |structure, (name, value)| structure.field(name, &node(*value)),
+                    )
+                    .finish(),
+                NodeKind::ChainOpen {
+                    statements,
+                    expression,
+                } => statements
+                    .iter()
+                    .chain([expression])
+                    .fold(
+                        &mut f.debug_tuple("chain_open".bright_green().to_string().as_str()),
+                        |structure, expression| structure.field(&node(*expression)),
+                    )
+                    .finish(),
+                NodeKind::ChainClosed { statements } => statements
+                    .iter()
+                    .fold(
+                        &mut f.debug_tuple("chain_closed".bright_green().to_string().as_str()),
+                        |structure, expression| structure.field(&node(*expression)),
                     )
                     .finish(),
             },

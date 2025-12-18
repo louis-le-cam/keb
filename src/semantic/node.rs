@@ -41,6 +41,13 @@ pub enum NodeKind {
     BuildStruct {
         fields: Vec<(String, Node)>,
     },
+    ChainOpen {
+        statements: Vec<Node>,
+        expression: Node,
+    },
+    ChainClosed {
+        statements: Vec<Node>,
+    },
 }
 
 #[derive(Sentinel, Clone, Copy, Debug)]

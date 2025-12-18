@@ -82,15 +82,15 @@ pub fn debug(syns: &Syns) {
                         .field(&dbg_syn(*function))
                         .field(&dbg_syn(*argument))
                         .finish(),
-                    SynData::Chain(syns) => syns
+                    SynData::ChainOpen(syns) => syns
                         .iter()
-                        .fold(&mut f.debug_tuple("tuple"), |tuple, expr| {
+                        .fold(&mut f.debug_tuple("chain_open"), |tuple, expr| {
                             tuple.field(&dbg_syn(*expr))
                         })
                         .finish(),
                     SynData::ChainClosed(syns) => syns
                         .iter()
-                        .fold(&mut f.debug_tuple("tuple"), |tuple, expr| {
+                        .fold(&mut f.debug_tuple("chain_closed"), |tuple, expr| {
                             tuple.field(&dbg_syn(*expr))
                         })
                         .finish(),

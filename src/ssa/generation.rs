@@ -181,6 +181,39 @@ fn generate_expression(
 
                 Expr::Inst(ssa.inst_product(types, block, fields))
             }
+            NodeKind::ChainOpen {
+                statements,
+                expression,
+            } => {
+                for statement in statements {
+                    generate_expression(
+                        ssa, block, source, tokens, semantic, types, *statement, bindings,
+                        functions,
+                    );
+                }
+
+                generate_expression(
+                    ssa,
+                    block,
+                    source,
+                    tokens,
+                    semantic,
+                    types,
+                    *expression,
+                    bindings,
+                    functions,
+                )
+            }
+            NodeKind::ChainClosed { statements } => {
+                for statement in statements {
+                    generate_expression(
+                        ssa, block, source, tokens, semantic, types, *statement, bindings,
+                        functions,
+                    );
+                }
+
+                Expr::Const(ConstSentinel::Unit.to_index())
+            }
         },
     }
 }

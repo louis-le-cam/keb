@@ -270,6 +270,29 @@ impl Inferrer<'_> {
 
                     self.add_type(i, type_);
                 }
+                NodeKind::ChainOpen {
+                    statements,
+                    expression,
+                } => {
+                    let expression = *expression;
+
+                    for statement in statements.clone() {
+                        self.infer_expression(scope, statement);
+                    }
+
+                    self.infer_expression(scope, expression);
+
+                    if let Val::Value(node_data) = self.nodes.get(expression) {
+                        self.add_type(i, node_data.ty);
+                    }
+                }
+                NodeKind::ChainClosed { statements } => {
+                    for statement in statements.clone() {
+                        self.infer_expression(scope, statement);
+                    }
+
+                    self.add_type(i, TypeSentinel::Unit.to_index());
+                }
             },
             Val::None => panic!(),
         }
