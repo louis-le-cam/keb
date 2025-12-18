@@ -76,12 +76,26 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                         print!(", ");
                         debug_expr(rhs);
                     }
-                    InstData::Call(block, arg) => {
+                    InstData::Call { block, argument } => {
                         print!(
                             "{} {}, ",
                             "call".bright_red().bold(),
                             format!("@{}", block.as_u32()).bright_yellow()
                         );
+                        debug_expr(argument);
+                    }
+                    InstData::Jump {
+                        block,
+                        condition,
+                        arg,
+                    } => {
+                        print!(
+                            "{} {} if ",
+                            "jump".bright_red().bold(),
+                            format!("@{}", block.as_u32()).bright_yellow()
+                        );
+                        debug_expr(condition);
+                        println!(", ");
                         debug_expr(arg);
                     }
                     InstData::Return(value) => {

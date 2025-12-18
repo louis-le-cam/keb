@@ -151,7 +151,7 @@ impl Generator<'_> {
                         self.generate_expr(*lhs),
                         self.generate_expr(*rhs),
                     )),
-                    InstData::Call(block, argument) => match self.ssa.blocks.get(*block) {
+                    InstData::Call { block, argument } => match self.ssa.blocks.get(*block) {
                         Val::None => panic!(),
                         Val::Value(
                             BlockData::ExternFunction { name, .. }
@@ -165,6 +165,7 @@ impl Generator<'_> {
                         }
                         Val::Value(BlockData::Block { .. }) => todo!(),
                     },
+                    InstData::Jump { .. } => panic!(),
                     InstData::Return(expr) => {
                         if self.ssa.expression_type(self.types, *expr).sentinel()
                             != Some(TypeSentinel::Unit)

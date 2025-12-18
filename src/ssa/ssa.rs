@@ -42,14 +42,14 @@ impl Ssa {
                 }
                 InstData::Record(_, ty) => *ty,
                 InstData::Add(lhs, _) => self.expression_type(types, *lhs),
-                InstData::Call(block, _) => match self.blocks.get(*block) {
+                InstData::Call { block, .. } => match self.blocks.get(*block) {
                     Val::None => panic!(),
                     Val::Value(
                         BlockData::ExternFunction { ret, .. } | BlockData::Function { ret, .. },
                     ) => *ret,
                     Val::Value(BlockData::Block { .. }) => TypeSentinel::Unit.to_index(),
                 },
-                InstData::Return(_) => TypeSentinel::Unit.to_index(),
+                InstData::Jump { .. } | InstData::Return(_) => TypeSentinel::Unit.to_index(),
             },
         }
     }
@@ -161,7 +161,13 @@ impl Ssa {
     }
 
     pub fn inst_call(&mut self, block: Block, target_block: Block, argument: Expr) -> Inst {
-        self.inst(block, InstData::Call(target_block, argument))
+        self.inst(
+            block,
+            InstData::Call {
+                block: target_block,
+                argument,
+            },
+        )
     }
 
     pub fn inst_return(&mut self, block: Block, expr: Expr) -> Inst {
@@ -215,7 +221,16 @@ pub enum InstData {
     Field(Expr, u32),
     Record(Vec<Expr>, Type),
     Add(Expr, Expr),
-    Call(Block, Expr), // call or jump depending on the block type?
+    Call {
+        block: Block,
+        argument: Expr,
+    },
+    Jump {
+        block: Block,
+        // Can be `Expr::Const(Const::TRUE)` for unconditional jumps
+        condition: Expr,
+        arg: Expr,
+    },
     Return(Expr),
 }
 
