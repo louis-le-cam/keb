@@ -237,15 +237,6 @@ impl Generator<'_> {
                     ConstData::Product(_, _) => todo!(),
                 },
             },
-            //  match const_ {
-            //     Const::UNIT => panic!(),
-            //     Const::FALSE => "false".to_string(),
-            //     Const::TRUE => "true".to_string(),
-            //     _ => match &self.ssa.consts[const_] {
-            //         ConstData::Uint32(value) => value.to_string(),
-            //         ConstData::Product(_, _) => todo!(),
-            //     },
-            // },
             Expr::Inst(inst) => format!("i{}", inst.as_u32()),
             Expr::BlockArg(block) => format!("a{}", block.as_u32()),
         }
