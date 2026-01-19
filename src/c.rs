@@ -29,7 +29,7 @@ struct Generator<'a> {
 impl Generator<'_> {
     fn result(self) -> String {
         format!(
-            "#include<stdio.h>\n#include<stdbool.h>\n\nvoid builtin_print(unsigned int x) {{ printf(\"%u\\n\", x); }}\n\n{}\n\n{}int main() {{ f{}_main(); return 0; }}\n",
+            "#include<stdio.h>\n\nvoid builtin_print(unsigned int x) {{ printf(\"%u\\n\", x); }}\n\n{}\n\n{}int main() {{ f{}_main(); return 0; }}\n",
             self.structs
                 .into_iter()
                 .map(|(_, definition)| definition)
