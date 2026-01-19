@@ -205,6 +205,10 @@ impl Parser<'_> {
         }
 
         if closed {
+            self.push(NodeKind::ChainClosed {
+                statements: expressions,
+            })
+        } else {
             let Some((expression, statements)) = expressions.split_last() else {
                 panic!();
             };
@@ -212,10 +216,6 @@ impl Parser<'_> {
             self.push(NodeKind::ChainOpen {
                 statements: statements.to_vec(),
                 expression: *expression,
-            })
-        } else {
-            self.push(NodeKind::ChainClosed {
-                statements: expressions,
             })
         }
     }
