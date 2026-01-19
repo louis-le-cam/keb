@@ -6,6 +6,7 @@ pub enum TokenKind {
     Number,
 
     Let,
+    Loop,
     False,
     True,
 

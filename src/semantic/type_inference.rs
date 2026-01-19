@@ -247,6 +247,12 @@ impl Inferrer<'_> {
                         Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
                     }
                 }
+                NodeKind::Loop(body) => {
+                    let body = *body;
+                    self.infer_expression(scope, body);
+                    // TODO: When we add `break`, the type inference should infer based on them
+                    self.add_type(i, TypeSentinel::Unit.to_index());
+                }
                 NodeKind::BuildStruct { fields } => {
                     let fields = fields.clone();
                     for (_, value) in &fields {

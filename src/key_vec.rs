@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 #[derive(Debug)]
 pub enum Val<S, V> {
@@ -87,6 +87,12 @@ impl<S: Sentinel> PartialEq for Index<S> {
 }
 
 impl<S: Sentinel> Eq for Index<S> {}
+
+impl<S: Sentinel> Hash for Index<S> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+    }
+}
 
 impl<S: Sentinel> Index<S> {
     pub const fn as_u32(self) -> u32 {

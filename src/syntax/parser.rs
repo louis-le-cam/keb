@@ -203,6 +203,11 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                     value: value,
                 })
             }
+            TokenKind::Loop => {
+                self.tokens.next();
+                let body = self.parse_application().unwrap();
+                self.syns.push(SynData::Loop(body))
+            }
             TokenKind::False => {
                 self.tokens.next();
                 self.syns.push(SynData::False(token))

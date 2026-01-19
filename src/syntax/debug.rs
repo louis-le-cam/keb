@@ -82,6 +82,7 @@ pub fn debug(syns: &Syns) {
                         .field(&dbg_syn(*function))
                         .field(&dbg_syn(*argument))
                         .finish(),
+                    SynData::Loop(body) => f.debug_tuple("loop").field(&dbg_syn(*body)).finish(),
                     SynData::ChainOpen(syns) => syns
                         .iter()
                         .fold(&mut f.debug_tuple("chain_open"), |tuple, expr| {

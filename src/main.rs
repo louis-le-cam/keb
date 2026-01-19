@@ -32,10 +32,11 @@ fn main() {
     semantic::debug(&semantic, &types);
 
     let ssa = ssa::generate(&source, &tokens, &semantic, &mut types);
-    let c = c::generate(&types, &ssa);
 
     debug_header("SSA");
     ssa::debug(&types, &ssa);
+
+    let c = c::generate(&types, &ssa);
 
     std::fs::write("output.c", c).unwrap();
 

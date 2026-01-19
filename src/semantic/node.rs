@@ -38,6 +38,7 @@ pub enum NodeKind {
         function: Node,
         argument: Node,
     },
+    Loop(Node),
     BuildStruct {
         fields: Vec<(String, Node)>,
     },

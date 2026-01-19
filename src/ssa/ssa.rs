@@ -42,7 +42,9 @@ impl Ssa {
                 }
                 InstData::Record(_, ty) => *ty,
                 InstData::Add(lhs, _) => self.expression_type(types, *lhs),
-                InstData::Call { block, .. } => match self.blocks.get(*block) {
+                InstData::Call {
+                    function: block, ..
+                } => match self.blocks.get(*block) {
                     Val::None => panic!(),
                     Val::Value(
                         BlockData::ExternFunction { ret, .. } | BlockData::Function { ret, .. },
@@ -160,11 +162,28 @@ impl Ssa {
         self.inst(block, InstData::Add(lhs, rhs))
     }
 
-    pub fn inst_call(&mut self, block: Block, target_block: Block, argument: Expr) -> Inst {
+    pub fn inst_call(&mut self, block: Block, target_function: Block, argument: Expr) -> Inst {
         self.inst(
             block,
             InstData::Call {
+                function: target_function,
+                argument,
+            },
+        )
+    }
+
+    pub fn inst_jump(
+        &mut self,
+        block: Block,
+        target_block: Block,
+        condition: Expr,
+        argument: Expr,
+    ) -> Inst {
+        self.inst(
+            block,
+            InstData::Jump {
                 block: target_block,
+                condition,
                 argument,
             },
         )
@@ -222,14 +241,14 @@ pub enum InstData {
     Record(Vec<Expr>, Type),
     Add(Expr, Expr),
     Call {
-        block: Block,
+        function: Block,
         argument: Expr,
     },
     Jump {
         block: Block,
         // Can be `Expr::Const(Const::TRUE)` for unconditional jumps
         condition: Expr,
-        arg: Expr,
+        argument: Expr,
     },
     Return(Expr),
 }

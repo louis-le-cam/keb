@@ -83,17 +83,11 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Nodes, types: &mut Typ
             panic!();
         };
 
-        let block = functions[name.as_str()];
+        let mut block = functions[name.as_str()];
+        let bindings = HashMap::from([(argument.clone(), Expr::BlockArg(block))]);
+
         let expr = generate_expression(
-            &mut ssa,
-            block,
-            source,
-            tokens,
-            semantic,
-            types,
-            *body,
-            &HashMap::from([(argument.clone(), Expr::BlockArg(block))]),
-            &functions,
+            &mut ssa, &mut block, source, tokens, semantic, types, *body, &bindings, &functions,
         );
         ssa.inst_return(block, expr);
     }
@@ -103,7 +97,7 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Nodes, types: &mut Typ
 
 fn generate_expression(
     ssa: &mut Ssa,
-    block: Block,
+    block: &mut Block,
     source: &str,
     tokens: &Tokens,
     semantic: &Nodes,
@@ -151,7 +145,7 @@ fn generate_expression(
                     ssa, block, source, tokens, semantic, types, *expr, bindings, functions,
                 );
 
-                Expr::Inst(ssa.inst_field(block, expr, field_index as u32))
+                Expr::Inst(ssa.inst_field(*block, expr, field_index as u32))
             }
             NodeKind::Application { function, argument } => {
                 let argument = generate_expression(
@@ -166,7 +160,29 @@ fn generate_expression(
                     panic!();
                 };
 
-                Expr::Inst(ssa.inst_call(block, functions[name], argument))
+                Expr::Inst(ssa.inst_call(*block, functions[name], argument))
+            }
+            NodeKind::Loop(body) => {
+                let loop_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+                ssa.inst_jump(
+                    *block,
+                    loop_block,
+                    Expr::Const(ConstSentinel::Unit.to_index()),
+                    Expr::Const(ConstSentinel::True.to_index()),
+                );
+                *block = loop_block;
+
+                generate_expression(
+                    ssa, block, source, tokens, semantic, types, *body, bindings, functions,
+                );
+
+                ssa.inst_jump(
+                    *block,
+                    *block,
+                    Expr::Const(ConstSentinel::Unit.to_index()),
+                    Expr::Const(ConstSentinel::True.to_index()),
+                );
+                Expr::Const(ConstSentinel::Unit.to_index())
             }
             NodeKind::BuildStruct { fields } => {
                 let fields = fields
@@ -179,7 +195,7 @@ fn generate_expression(
                     })
                     .collect();
 
-                Expr::Inst(ssa.inst_product(types, block, fields))
+                Expr::Inst(ssa.inst_product(types, *block, fields))
             }
             NodeKind::ChainOpen {
                 statements,

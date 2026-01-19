@@ -160,6 +160,10 @@ impl Parser<'_> {
                     let argument = self.parse_expression(*argument);
                     self.push(NodeKind::Application { function, argument })
                 }
+                SynData::Loop(body) => {
+                    let body = self.parse_expression(*body);
+                    self.push(NodeKind::Loop(body))
+                }
                 SynData::Paren(expr) => self.parse_expression(*expr),
                 SynData::Tuple(nodes) => {
                     let fields = nodes

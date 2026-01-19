@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 use crate::{
     key_vec::Val,
     semantic::{Type, TypeData, TypeSentinel, Types, types_equals},
-    ssa::{Block, BlockData, ConstData, ConstSentinel, Expr, InstData, Ssa},
+    ssa::{Block, BlockData, ConstData, ConstSentinel, Expr, Inst, InstData, Ssa},
 };
 
 pub fn generate(types: &Types, ssa: &Ssa) -> String {
@@ -122,18 +124,73 @@ impl Generator<'_> {
             )
         };
 
+        let mut body = self.generate_statements(insts.iter().copied());
+
+        let blocks = self.function_blocks(function);
+        for block in blocks {
+            // TODO: handle block arguments
+            let Val::Value(BlockData::Block { insts, .. }) = self.ssa.blocks.get(block) else {
+                panic!()
+            };
+
+            body.push_str(&format!("b{}:\n", block.as_u32()));
+            body.push_str(&self.generate_statements(insts.iter().copied()));
+        }
+
+        format!("{head} {{\n{body}}}")
+    }
+
+    fn function_blocks(&mut self, function: Block) -> HashSet<Block> {
+        let Val::Value(BlockData::Function { insts, .. }) = &self.ssa.blocks.get(function) else {
+            panic!()
+        };
+
+        let mut blocks = HashSet::new();
+
+        for inst in insts {
+            match self.ssa.insts.get(*inst) {
+                Val::Value(InstData::Jump { block, .. }) => {
+                    blocks.insert(*block);
+                }
+                _ => {}
+            }
+        }
+
+        let mut checked_blocks = HashSet::new();
+
+        while let Some(&block) = blocks.difference(&checked_blocks).next() {
+            checked_blocks.insert(block);
+
+            let Val::Value(BlockData::Block { insts, .. }) = self.ssa.blocks.get(block) else {
+                panic!();
+            };
+
+            for inst in insts {
+                match self.ssa.insts.get(*inst) {
+                    Val::Value(InstData::Jump { block, .. }) => {
+                        blocks.insert(*block);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        blocks
+    }
+
+    fn generate_statements(&mut self, insts: impl IntoIterator<Item = Inst>) -> String {
         let mut body = String::new();
 
         for inst in insts {
             body.push_str("    ");
 
-            let type_ = self.ssa.instruction_type(self.types, *inst);
+            let type_ = self.ssa.instruction_type(self.types, inst);
             let c_type = self.generate_type(type_);
             if c_type != "void" {
                 body.push_str(&format!("{c_type} i{} = ", inst.as_u32()));
             }
 
-            match self.ssa.insts.get(*inst) {
+            match self.ssa.insts.get(inst) {
                 Val::None => panic!(),
                 Val::Value(inst_data) => match inst_data {
                     InstData::Field(expr, field) => {
@@ -151,7 +208,7 @@ impl Generator<'_> {
                         self.generate_expr(*lhs),
                         self.generate_expr(*rhs),
                     )),
-                    InstData::Call { block, argument } => match self.ssa.blocks.get(*block) {
+                    InstData::Call { function, argument } => match self.ssa.blocks.get(*function) {
                         Val::None => panic!(),
                         Val::Value(
                             BlockData::ExternFunction { name, .. }
@@ -159,13 +216,20 @@ impl Generator<'_> {
                         ) => {
                             body.push_str(&format!(
                                 "f{}_{name}({})",
-                                block.as_u32(),
+                                function.as_u32(),
                                 self.generate_expr(*argument)
                             ));
                         }
-                        Val::Value(BlockData::Block { .. }) => todo!(),
+                        Val::Value(BlockData::Block { .. }) => panic!(),
                     },
-                    InstData::Jump { .. } => panic!(),
+                    // TODO: Handle the block argument (probably by setting
+                    // a variable declared at the start of the function)
+                    // TODO: Handle conditional jumps
+                    InstData::Jump {
+                        block,
+                        condition,
+                        argument,
+                    } => body.push_str(&format!("goto b{}", block.as_u32(),)),
                     InstData::Return(expr) => {
                         if let Some(TypeSentinel::Unit) =
                             self.ssa.expression_type(self.types, *expr).sentinel()
@@ -181,7 +245,7 @@ impl Generator<'_> {
             body.push_str(";\n");
         }
 
-        format!("{head} {{\n{body}}}")
+        body
     }
 
     fn generate_type(&mut self, type_: Type) -> String {
