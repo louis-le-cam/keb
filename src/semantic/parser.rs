@@ -119,11 +119,8 @@ impl Parser<'_> {
                         (pattern, TypeSentinel::Unknown.to_index())
                     };
 
-                    let (body, pattern_type) = self.sift_through_pattern(
-                        param,
-                        *pattern,
-                        SyntaxOrSemanticNode::Syntax(*body),
-                    );
+                    let body = self.parse_expression(*body);
+                    let (body, pattern_type) = self.sift_through_pattern(param, *pattern, body);
 
                     let argument_type = combine_types(&mut self.types, argument_type, pattern_type);
 
@@ -178,58 +175,60 @@ impl Parser<'_> {
                     self.add_type(expression, ty);
                     expression
                 }
-                SynData::ChainOpen(syns) => {
-                    let statements = syns
-                        .iter()
-                        .take(syns.len() - 1)
-                        .map(|syn| self.parse_expression(*syn))
-                        .collect();
-                    let expression = self.parse_expression(*syns.last().unwrap());
-                    self.push(NodeKind::ChainOpen {
-                        statements,
-                        expression,
-                    })
-                }
-                SynData::ChainClosed(syns) => {
-                    let statements = syns.iter().map(|syn| self.parse_expression(*syn)).collect();
-                    self.push(NodeKind::ChainClosed { statements })
-                }
+                SynData::ChainOpen(syns) => self.parse_chain(syns.iter().copied(), false),
+                SynData::ChainClosed(syns) => self.parse_chain(syns.iter().copied(), true),
                 expr => panic!("{expr:?}"),
             },
         }
     }
 
-    fn sift_through_pattern(
-        &mut self,
-        value: Node,
-        pattern: Syn,
-        body: SyntaxOrSemanticNode,
-    ) -> (Node, Type) {
+    fn parse_chain(&mut self, mut syns: impl Iterator<Item = Syn>, closed: bool) -> Node {
+        let mut expressions = Vec::new();
+
+        while let Some(syn) = syns.next() {
+            match self.syntax.get(syn) {
+                Val::None => panic!(),
+                Val::Value(SynData::Binding { pattern, value }) => {
+                    let value = self.parse_expression(*value);
+                    let body = self.parse_chain(syns, closed);
+                    expressions.push(self.sift_through_pattern(value, *pattern, body).0);
+                    break;
+                }
+                _ => {
+                    expressions.push(self.parse_expression(syn));
+                }
+            }
+        }
+
+        if closed {
+            let Some((expression, statements)) = expressions.split_last() else {
+                panic!();
+            };
+
+            self.push(NodeKind::ChainOpen {
+                statements: statements.to_vec(),
+                expression: *expression,
+            })
+        } else {
+            self.push(NodeKind::ChainClosed {
+                statements: expressions,
+            })
+        }
+    }
+
+    fn sift_through_pattern(&mut self, value: Node, pattern: Syn, body: Node) -> (Node, Type) {
         match self.syntax.get(pattern) {
             Val::None => panic!(),
             Val::Value(syn_data) => match syn_data {
-                SynData::Ident(token) => {
-                    let body = match body {
-                        SyntaxOrSemanticNode::Syntax(node) => self.parse_expression(node),
-                        SyntaxOrSemanticNode::Semantic(node) => node,
-                    };
-                    (
-                        self.push(NodeKind::Binding {
-                            name: token::parse_identifer(self.source, self.tokens, *token)
-                                .to_string(),
-                            value,
-                            body,
-                        }),
-                        TypeSentinel::Unknown.to_index(),
-                    )
-                }
-                SynData::EmptyParen(_) => (
-                    match body {
-                        SyntaxOrSemanticNode::Syntax(node) => self.parse_expression(node),
-                        SyntaxOrSemanticNode::Semantic(node) => node,
-                    },
-                    TypeSentinel::Unit.to_index(),
+                SynData::Ident(token) => (
+                    self.push(NodeKind::Binding {
+                        name: token::parse_identifer(self.source, self.tokens, *token).to_string(),
+                        value,
+                        body,
+                    }),
+                    TypeSentinel::Unknown.to_index(),
                 ),
+                SynData::EmptyParen(_) => (body, TypeSentinel::Unit.to_index()),
                 SynData::Paren(expr) => self.sift_through_pattern(value, *expr, body),
                 SynData::Ascription {
                     syn,
@@ -254,14 +253,11 @@ impl Parser<'_> {
 
                         fields_types.push((i.to_string(), field_type));
 
-                        body = SyntaxOrSemanticNode::Semantic(field);
+                        body = field;
                     }
 
                     (
-                        match body {
-                            SyntaxOrSemanticNode::Syntax(node) => self.parse_expression(node),
-                            SyntaxOrSemanticNode::Semantic(node) => node,
-                        },
+                        body,
                         self.types.push(TypeData::Product {
                             fields: fields_types,
                         }),
@@ -307,9 +303,4 @@ impl Parser<'_> {
             },
         }
     }
-}
-
-enum SyntaxOrSemanticNode {
-    Syntax(Syn),
-    Semantic(Node),
 }
