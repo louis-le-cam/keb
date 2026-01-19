@@ -167,9 +167,11 @@ impl Generator<'_> {
                     },
                     InstData::Jump { .. } => panic!(),
                     InstData::Return(expr) => {
-                        if self.ssa.expression_type(self.types, *expr).sentinel()
-                            != Some(TypeSentinel::Unit)
+                        if let Some(TypeSentinel::Unit) =
+                            self.ssa.expression_type(self.types, *expr).sentinel()
                         {
+                            body.push_str("return");
+                        } else {
                             body.push_str(&format!("return {}", self.generate_expr(*expr)))
                         }
                     }
