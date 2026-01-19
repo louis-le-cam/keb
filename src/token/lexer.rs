@@ -46,6 +46,10 @@ pub fn lex(source: &str) -> Tokens {
                     while let Some(_) = chars.next_if(|(_, ch)| *ch != '\n') {}
                     continue;
                 }
+                '#' => {
+                    while let Some(_) = chars.next_if(|(_, ch)| *ch != '\n') {}
+                    continue;
+                }
 
                 '0'..='9' => {
                     while let Some(_) = chars.next_if(|(_, ch)| matches!(ch, '0'..='9')) {}
