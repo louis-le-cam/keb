@@ -295,8 +295,8 @@ impl Generator<'_> {
                 Val::None => panic!(),
                 Val::Sentinel(sentinel) => match sentinel {
                     ConstSentinel::Unit => panic!(),
-                    ConstSentinel::False => "true".to_string(),
-                    ConstSentinel::True => "false".to_string(),
+                    ConstSentinel::False => "false".to_string(),
+                    ConstSentinel::True => "true".to_string(),
                 },
                 Val::Value(value) => match value {
                     ConstData::Uint32(value) => value.to_string(),
