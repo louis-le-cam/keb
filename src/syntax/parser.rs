@@ -64,7 +64,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             };
 
             match self.tokens.peek() {
-                Some((_, TokenKind::Semicolon)) => {}
+                Some((_, TokenKind::Semicolon)) => self.tokens.next(),
                 _ => break false,
             };
         };
