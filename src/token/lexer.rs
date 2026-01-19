@@ -42,6 +42,9 @@ pub fn lex(source: &str) -> Tokens {
                 // usually start at the first line.
                 //
                 // There is also `--` as an honorable mention...
+                //
+                // `#` could also be used as attribute syntax `#[attr]` or
+                // `#attr`, which would conflict with the comment syntax.
                 '/' if chars.next_if(|(_, ch)| *ch == '/').is_some() => {
                     while let Some(_) = chars.next_if(|(_, ch)| *ch != '\n') {}
                     continue;
