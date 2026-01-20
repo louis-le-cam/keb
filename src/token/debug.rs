@@ -16,7 +16,7 @@ pub fn debug(source: &str, tokens: &Tokens) {
         }
 
         let text = match kind {
-            TokenKind::Ident => parse_identifer(source, tokens, token).bright_white(),
+            TokenKind::Ident => parse_identifer(source, tokens, token).bright_cyan(),
             TokenKind::Number => parse_u64(source, tokens, token).to_string().bright_purple(),
             TokenKind::Let => "let".bright_red(),
             TokenKind::Loop => "loop".bright_red(),
