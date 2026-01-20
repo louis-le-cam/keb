@@ -1,9 +1,11 @@
+mod debug;
 mod lexer;
 mod token;
 
 use crate::key_vec::Val;
 
 pub use self::{
+    debug::debug,
     lexer::lex,
     token::{Token, TokenKind, Tokens},
 };

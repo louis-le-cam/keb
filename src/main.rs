@@ -17,8 +17,11 @@ fn main() {
     let source = std::fs::read_to_string("input.keb").unwrap();
     println!("{source}");
 
-    debug_header("SYNTAX");
+    debug_header("TOKENS");
     let tokens = token::lex(&source);
+    token::debug(&source, &tokens);
+
+    debug_header("SYNTAX");
     let syntax = syntax::parse(&tokens);
     syntax::debug(&syntax);
 
