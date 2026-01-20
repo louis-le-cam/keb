@@ -51,6 +51,9 @@ pub enum SynData {
         then: Syn,
         else_: Syn,
     },
+    // TODO: Find a solution to avoid nested allocation from the [`Vec<Syn>`],
+    // maybe reference a range of syns (with a start and a length) in the main
+    // vector.
     ChainOpen(Vec<Syn>),
     ChainClosed(Vec<Syn>),
 }
