@@ -164,6 +164,27 @@ impl Parser<'_> {
                     let body = self.parse_expression(*body);
                     self.push(NodeKind::Loop(body))
                 }
+                SynData::If { condition, then } => {
+                    let condition = self.parse_expression(*condition);
+                    let then = self.parse_expression(*then);
+
+                    self.push(NodeKind::If { condition, then })
+                }
+                SynData::IfElse {
+                    condition,
+                    then,
+                    else_,
+                } => {
+                    let condition = self.parse_expression(*condition);
+                    let then = self.parse_expression(*then);
+                    let else_ = self.parse_expression(*else_);
+
+                    self.push(NodeKind::IfElse {
+                        condition,
+                        then,
+                        else_,
+                    })
+                }
                 SynData::Paren(expr) => self.parse_expression(*expr),
                 SynData::Tuple(nodes) => {
                     let fields = nodes

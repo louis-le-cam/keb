@@ -253,6 +253,42 @@ impl Inferrer<'_> {
                     // TODO: When we add `break`, the type inference should infer based on them
                     self.add_type(i, TypeSentinel::Unit.to_index());
                 }
+                NodeKind::If { condition, then } => {
+                    let condition = *condition;
+                    let then = *then;
+
+                    self.add_type(condition, TypeSentinel::Bool.to_index());
+                    self.infer_expression(scope, then);
+                    self.add_type(then, TypeSentinel::Unit.to_index());
+                    self.add_type(i, TypeSentinel::Unit.to_index());
+                }
+                NodeKind::IfElse {
+                    condition,
+                    then,
+                    else_,
+                } => {
+                    let condition = *condition;
+                    let then = *then;
+                    let else_ = *else_;
+
+                    self.add_type(condition, TypeSentinel::Bool.to_index());
+
+                    self.infer_expression(scope, then);
+                    self.infer_expression(scope, else_);
+
+                    let then_type = match self.nodes.get(then) {
+                        Val::None => panic!(),
+                        Val::Value(node_data) => node_data.ty,
+                    };
+                    let else_type = match self.nodes.get(then) {
+                        Val::None => panic!(),
+                        Val::Value(node_data) => node_data.ty,
+                    };
+
+                    self.add_type(then, else_type);
+                    self.add_type(else_, then_type);
+                    self.add_type(i, then_type);
+                }
                 NodeKind::BuildStruct { fields } => {
                     let fields = fields.clone();
                     for (_, value) in &fields {

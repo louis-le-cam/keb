@@ -66,6 +66,9 @@ pub fn lex(source: &str) -> Tokens {
                     match &source[start..chars.peek().map(|(i, _)| *i).unwrap_or(source.len())] {
                         "let" => TokenKind::Let,
                         "loop" => TokenKind::Loop,
+                        "if" => TokenKind::If,
+                        "then" => TokenKind::Then,
+                        "else" => TokenKind::Else,
                         "false" => TokenKind::False,
                         "true" => TokenKind::True,
                         _ => TokenKind::Ident,

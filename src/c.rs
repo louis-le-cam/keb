@@ -124,12 +124,31 @@ impl Generator<'_> {
             )
         };
 
-        let mut body = self.generate_statements(insts.iter().copied());
+        let mut body = String::new();
 
         let blocks = self.function_blocks(function);
-        for block in blocks {
-            // TODO: handle block arguments
-            let Val::Value(BlockData::Block { insts, .. }) = self.ssa.blocks.get(block) else {
+
+        for block in &blocks {
+            let Val::Value(BlockData::Block { arg, insts: _ }) = self.ssa.blocks.get(*block) else {
+                panic!()
+            };
+
+            match arg.sentinel() {
+                Some(TypeSentinel::Unit) => {}
+                _ => {
+                    body.push_str(&format!(
+                        "    {} a{};\n",
+                        self.generate_type(*arg),
+                        block.as_u32(),
+                    ));
+                }
+            }
+        }
+
+        body.push_str(&self.generate_statements(insts.iter().copied()));
+
+        for block in &blocks {
+            let Val::Value(BlockData::Block { insts, .. }) = self.ssa.blocks.get(*block) else {
                 panic!()
             };
 
@@ -152,6 +171,10 @@ impl Generator<'_> {
                 Val::Value(InstData::Jump { block, .. }) => {
                     blocks.insert(*block);
                 }
+                Val::Value(InstData::JumpCondition { then, else_, .. }) => {
+                    blocks.insert(*then);
+                    blocks.insert(*else_);
+                }
                 _ => {}
             }
         }
@@ -169,6 +192,10 @@ impl Generator<'_> {
                 match self.ssa.insts.get(*inst) {
                     Val::Value(InstData::Jump { block, .. }) => {
                         blocks.insert(*block);
+                    }
+                    Val::Value(InstData::JumpCondition { then, else_, .. }) => {
+                        blocks.insert(*then);
+                        blocks.insert(*else_);
                     }
                     _ => {}
                 }
@@ -214,22 +241,40 @@ impl Generator<'_> {
                             BlockData::ExternFunction { name, .. }
                             | BlockData::Function { name, .. },
                         ) => {
+                            let argument_text = match argument {
+                                Expr::Const(const_)
+                                    if const_.sentinel() == Some(ConstSentinel::Unit) =>
+                                {
+                                    ""
+                                }
+                                _ => &self.generate_expr(*argument),
+                            };
+
                             body.push_str(&format!(
-                                "f{}_{name}({})",
+                                "f{}_{name}({argument_text})",
                                 function.as_u32(),
-                                self.generate_expr(*argument)
                             ));
                         }
                         Val::Value(BlockData::Block { .. }) => panic!(),
                     },
-                    // TODO: Handle the block argument (probably by setting
-                    // a variable declared at the start of the function)
-                    // TODO: Handle conditional jumps
-                    InstData::Jump {
-                        block,
+                    InstData::Jump { block, argument } => {
+                        body.push_str(&format!(
+                            "a{} = {};\n    goto b{}",
+                            block.as_u32(),
+                            self.generate_expr(*argument),
+                            block.as_u32(),
+                        ));
+                    }
+                    InstData::JumpCondition {
                         condition,
-                        argument,
-                    } => body.push_str(&format!("goto b{}", block.as_u32(),)),
+                        then,
+                        else_,
+                    } => body.push_str(&format!(
+                        "if ({}) {{ goto b{}; }} else {{ goto b{}; }}",
+                        self.generate_expr(*condition),
+                        then.as_u32(),
+                        else_.as_u32(),
+                    )),
                     InstData::Return(expr) => {
                         if let Some(TypeSentinel::Unit) =
                             self.ssa.expression_type(self.types, *expr).sentinel()

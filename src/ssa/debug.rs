@@ -42,7 +42,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
             }
             // Maybe not print block here ?
             BlockData::Block { arg, insts } => {
-                print!("@{} ", block.as_u32());
+                print!("{}", format!("@{} ", block.as_u32()).bright_yellow());
                 debug_type(types, *arg);
                 println!();
                 insts
@@ -84,19 +84,32 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                         );
                         debug_expr(argument);
                     }
-                    InstData::Jump {
-                        block,
-                        condition,
-                        argument,
-                    } => {
+                    InstData::Jump { block, argument } => {
                         print!(
-                            "{} {} if ",
+                            "{} {}",
                             "jump".bright_red().bold(),
                             format!("@{}", block.as_u32()).bright_yellow()
                         );
-                        debug_expr(condition);
                         print!(", ");
                         debug_expr(argument);
+                    }
+                    InstData::JumpCondition {
+                        condition,
+                        then,
+                        else_,
+                    } => {
+                        print!(
+                            "{} {} {} ",
+                            "jump".bright_red().bold(),
+                            format!("@{}", then.as_u32()).bright_yellow(),
+                            "if".bright_red(),
+                        );
+                        debug_expr(condition);
+                        print!(
+                            " {} {}",
+                            "else".bright_red(),
+                            format!("@{}", else_.as_u32()).bright_yellow()
+                        );
                     }
                     InstData::Return(value) => {
                         print!("{} ", "return".bright_red().bold());
@@ -133,7 +146,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
 fn debug_type(types: &Types, type_: Type) {
     match types.get(type_) {
         Val::None => panic!(),
-        Val::Sentinel(sentinel) => print!("{sentinel:?}"),
+        Val::Sentinel(sentinel) => print!("{}", format!("{sentinel:?}").bright_blue()),
         Val::Value(type_data) => match type_data {
             TypeData::Function { .. } => todo!(),
             TypeData::Product { fields } => {
@@ -153,7 +166,18 @@ fn debug_type(types: &Types, type_: Type) {
 
 fn debug_expr(expr: &Expr) {
     match expr {
-        Expr::Const(const_) => print!("{}", format!("${}", const_.as_u32()).bright_magenta()),
+        Expr::Const(const_) => {
+            let text = match const_.sentinel() {
+                Some(sentinel) => match sentinel {
+                    ConstSentinel::Unit => "()",
+                    ConstSentinel::False => "false",
+                    ConstSentinel::True => "true",
+                },
+                None => &format!("${}", const_.as_u32()).to_string(),
+            };
+
+            print!("{}", format!("{text}").bright_magenta())
+        }
         Expr::Inst(inst) => print!("{}", format!("%{}", inst.as_u32()).bright_green()),
         Expr::BlockArg(block) => {
             print!("{}", format!("param(@{})", block.as_u32()).bright_yellow())

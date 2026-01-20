@@ -83,6 +83,21 @@ pub fn debug(syns: &Syns) {
                         .field(&dbg_syn(*argument))
                         .finish(),
                     SynData::Loop(body) => f.debug_tuple("loop").field(&dbg_syn(*body)).finish(),
+                    SynData::If { condition, then } => f
+                        .debug_tuple("if")
+                        .field(&dbg_syn(*condition))
+                        .field(&dbg_syn(*then))
+                        .finish(),
+                    SynData::IfElse {
+                        condition,
+                        then,
+                        else_,
+                    } => f
+                        .debug_tuple("if_else")
+                        .field(&dbg_syn(*condition))
+                        .field(&dbg_syn(*then))
+                        .field(&dbg_syn(*else_))
+                        .finish(),
                     SynData::ChainOpen(syns) => syns
                         .iter()
                         .fold(&mut f.debug_tuple("chain_open"), |tuple, expr| {

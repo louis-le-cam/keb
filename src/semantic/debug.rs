@@ -65,6 +65,14 @@ impl std::fmt::Debug for DebugNode<'_> {
                     display("application", &[&node(*function), &node(*argument)])
                 }
                 NodeKind::Loop(body) => display("loop", &[&node(*body)]),
+                NodeKind::If { condition, then } => {
+                    display("if", &[&node(*condition), &node(*then)])
+                }
+                NodeKind::IfElse {
+                    condition,
+                    then,
+                    else_,
+                } => display("if", &[&node(*condition), &node(*then), &node(*else_)]),
                 NodeKind::BuildStruct { fields } => fields
                     .iter()
                     .fold(

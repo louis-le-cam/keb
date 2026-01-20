@@ -208,6 +208,33 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 let body = self.parse_application().unwrap();
                 self.syns.push(SynData::Loop(body))
             }
+            TokenKind::If => {
+                self.tokens.next();
+
+                let condition = self.parse_application().unwrap();
+
+                let Some((_, TokenKind::Then)) = self.tokens.next() else {
+                    panic!()
+                };
+
+                let then = self.parse_application().unwrap();
+
+                if self
+                    .tokens
+                    .next_if(|(_, token)| *token == TokenKind::Else)
+                    .is_none()
+                {
+                    self.syns.push(SynData::If { condition, then })
+                } else {
+                    let else_ = self.parse_application().unwrap();
+
+                    self.syns.push(SynData::IfElse {
+                        condition,
+                        then,
+                        else_,
+                    })
+                }
+            }
             TokenKind::False => {
                 self.tokens.next();
                 self.syns.push(SynData::False(token))
@@ -252,7 +279,9 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                     None => self.syns.push(SynData::EmptyCurly(token)),
                 }
             }
-            TokenKind::EqualGreater
+            TokenKind::Then
+            | TokenKind::Else
+            | TokenKind::EqualGreater
             | TokenKind::Equal
             | TokenKind::Plus
             | TokenKind::HyphenGreater

@@ -39,6 +39,15 @@ pub enum NodeKind {
         argument: Node,
     },
     Loop(Node),
+    If {
+        condition: Node,
+        then: Node,
+    },
+    IfElse {
+        condition: Node,
+        then: Node,
+        else_: Node,
+    },
     BuildStruct {
         fields: Vec<(String, Node)>,
     },

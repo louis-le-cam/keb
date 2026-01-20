@@ -168,7 +168,6 @@ fn generate_expression(
                     *block,
                     loop_block,
                     Expr::Const(ConstSentinel::Unit.to_index()),
-                    Expr::Const(ConstSentinel::True.to_index()),
                 );
                 *block = loop_block;
 
@@ -176,13 +175,90 @@ fn generate_expression(
                     ssa, block, source, tokens, semantic, types, *body, bindings, functions,
                 );
 
-                ssa.inst_jump(
-                    *block,
-                    *block,
-                    Expr::Const(ConstSentinel::Unit.to_index()),
-                    Expr::Const(ConstSentinel::True.to_index()),
-                );
+                ssa.inst_jump(*block, *block, Expr::Const(ConstSentinel::Unit.to_index()));
                 Expr::Const(ConstSentinel::Unit.to_index())
+            }
+            NodeKind::If { condition, then } => {
+                let condition = generate_expression(
+                    ssa, block, source, tokens, semantic, types, *condition, bindings, functions,
+                );
+
+                let mut then_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+                let after_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+
+                ssa.inst_jump_condition(*block, condition, then_block, after_block);
+
+                generate_expression(
+                    ssa,
+                    &mut then_block,
+                    source,
+                    tokens,
+                    semantic,
+                    types,
+                    *then,
+                    bindings,
+                    functions,
+                );
+
+                ssa.inst_jump(
+                    then_block,
+                    after_block,
+                    Expr::Const(ConstSentinel::Unit.to_index()),
+                );
+
+                *block = after_block;
+
+                Expr::Const(ConstSentinel::Unit.to_index())
+            }
+            NodeKind::IfElse {
+                condition,
+                then,
+                else_,
+            } => {
+                let condition = generate_expression(
+                    ssa, block, source, tokens, semantic, types, *condition, bindings, functions,
+                );
+
+                let mut then_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+                let mut else_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+
+                ssa.inst_jump_condition(*block, condition, then_block, else_block);
+
+                let then_expr = generate_expression(
+                    ssa,
+                    &mut then_block,
+                    source,
+                    tokens,
+                    semantic,
+                    types,
+                    *then,
+                    bindings,
+                    functions,
+                );
+
+                let else_expr = generate_expression(
+                    ssa,
+                    &mut else_block,
+                    source,
+                    tokens,
+                    semantic,
+                    types,
+                    *else_,
+                    bindings,
+                    functions,
+                );
+
+                let Val::Value(NodeData { ty: type_, kind: _ }) = semantic.get(*then) else {
+                    panic!()
+                };
+
+                let after_block = ssa.basic_block(*type_);
+                ssa.inst_jump(then_block, after_block, then_expr);
+                ssa.inst_jump(else_block, after_block, else_expr);
+
+                *block = after_block;
+
+                Expr::BlockArg(after_block)
             }
             NodeKind::BuildStruct { fields } => {
                 let fields = fields

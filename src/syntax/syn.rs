@@ -12,18 +12,45 @@ pub enum SynData {
     Number(Token),
     Add(Syn, Syn),
     Subtract(Syn, Syn),
-    Binding { pattern: Syn, value: Syn },
-    Function { pattern: Syn, body: Syn },
-    ReturnAscription { syn: Syn, type_: Syn },
-    Ascription { syn: Syn, type_: Syn },
-    Access { syn: Syn, key: Syn },
+    Binding {
+        pattern: Syn,
+        value: Syn,
+    },
+    Function {
+        pattern: Syn,
+        body: Syn,
+    },
+    ReturnAscription {
+        syn: Syn,
+        type_: Syn,
+    },
+    Ascription {
+        syn: Syn,
+        type_: Syn,
+    },
+    Access {
+        syn: Syn,
+        key: Syn,
+    },
     EmptyParen(Token),
     Paren(Syn),
     EmptyCurly(Token),
     Curly(Syn),
     Tuple(Vec<Syn>),
-    Application { function: Syn, argument: Syn },
+    Application {
+        function: Syn,
+        argument: Syn,
+    },
     Loop(Syn),
+    If {
+        condition: Syn,
+        then: Syn,
+    },
+    IfElse {
+        condition: Syn,
+        then: Syn,
+        else_: Syn,
+    },
     ChainOpen(Vec<Syn>),
     ChainClosed(Vec<Syn>),
 }

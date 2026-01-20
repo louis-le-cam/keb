@@ -51,7 +51,9 @@ impl Ssa {
                     ) => *ret,
                     Val::Value(BlockData::Block { .. }) => TypeSentinel::Unit.to_index(),
                 },
-                InstData::Jump { .. } | InstData::Return(_) => TypeSentinel::Unit.to_index(),
+                InstData::Jump { .. } | InstData::JumpCondition { .. } | InstData::Return(_) => {
+                    TypeSentinel::Unit.to_index()
+                }
             },
         }
     }
@@ -172,19 +174,29 @@ impl Ssa {
         )
     }
 
-    pub fn inst_jump(
-        &mut self,
-        block: Block,
-        target_block: Block,
-        condition: Expr,
-        argument: Expr,
-    ) -> Inst {
+    pub fn inst_jump(&mut self, block: Block, target_block: Block, argument: Expr) -> Inst {
         self.inst(
             block,
             InstData::Jump {
                 block: target_block,
-                condition,
                 argument,
+            },
+        )
+    }
+
+    pub fn inst_jump_condition(
+        &mut self,
+        block: Block,
+        condition: Expr,
+        then: Block,
+        else_: Block,
+    ) -> Inst {
+        self.inst(
+            block,
+            InstData::JumpCondition {
+                condition,
+                then,
+                else_,
             },
         )
     }
@@ -201,7 +213,7 @@ pub enum BlockSentinel {}
 pub enum InstSentinel {}
 
 #[repr(u32)]
-#[derive(Sentinel, Clone, Copy, Debug)]
+#[derive(Sentinel, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConstSentinel {
     Unit = u32::MAX - 2,
     False,
@@ -246,9 +258,13 @@ pub enum InstData {
     },
     Jump {
         block: Block,
-        // Can be `Expr::Const(Const::TRUE)` for unconditional jumps
-        condition: Expr,
         argument: Expr,
+    },
+    JumpCondition {
+        condition: Expr,
+        then: Block,
+        else_: Block,
+        // TODO: Block arguments
     },
     Return(Expr),
 }

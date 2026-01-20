@@ -7,6 +7,9 @@ pub enum TokenKind {
 
     Let,
     Loop,
+    If,
+    Then,
+    Else,
     False,
     True,
 
