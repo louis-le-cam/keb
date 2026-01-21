@@ -18,9 +18,6 @@ fn main() {
 
     debug_header("SEMANTIC");
     let (mut semantic, mut types) = semantic::parse(&source, &tokens, &syntax);
-    semantic::debug(&semantic, &types);
-
-    debug_header("TYPED SEMANTIC");
     semantic::infer_types(&mut semantic, &mut types);
     semantic::debug(&semantic, &types);
 
