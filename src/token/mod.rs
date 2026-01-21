@@ -91,6 +91,7 @@ pub fn parse_string_escape(source: &str, tokens: &Tokens, token: Token) -> char 
 
     match source_from_token.chars().nth(1).unwrap() {
         'n' => '\n',
+        '\\' => '\\',
         '{' => '{',
         _ => panic!(),
     }
