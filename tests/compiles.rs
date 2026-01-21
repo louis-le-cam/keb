@@ -27,7 +27,7 @@ fn test_if_compiles(source: &str) {
 }
 
 #[test]
-fn add_function_with_argument_destructuring() {
+fn addition_function_with_argument_destructuring() {
     let source = r#"
         let add = (a: u32, b: u32) => a + b;
 
@@ -52,6 +52,22 @@ fn if_then_else_expression() {
 
 // NOTE: Not yet implemented
 #[test]
+#[should_panic]
+fn print_string() {
+    let source = r#"
+        let main = (
+            let hello_world = "Hello world!";
+
+            print hello_world;
+        );
+    "#;
+
+    test_if_compiles(source);
+}
+
+// NOTE: Not yet implemented
+#[test]
+#[should_panic]
 fn factorial_recursive_match() {
     let source = r#"
         let fact = match {
