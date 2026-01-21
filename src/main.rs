@@ -7,11 +7,8 @@ use colored::Colorize;
 use keb::{c, semantic, ssa, syntax, token};
 
 fn main() {
-    debug_header("SOURCE");
+    debug_header("SOURCE (colored based on tokens)");
     let source = std::fs::read_to_string("input.keb").unwrap();
-    println!("{source}");
-
-    debug_header("TOKENS");
     let tokens = token::lex(&source);
     token::debug(&source, &tokens);
 
