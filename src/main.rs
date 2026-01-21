@@ -34,8 +34,7 @@ fn main() {
 
     debug_header("CLANG");
     let clang_exit_status = Command::new("clang")
-        .arg("output.c")
-        .arg("-std=c23")
+        .args(["output.c", "-std=c23"])
         .spawn()
         .unwrap()
         .wait()
