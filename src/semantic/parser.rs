@@ -1,56 +1,56 @@
 use crate::{
     key_vec::{Sentinel, Val},
     semantic::{
-        self, Node, NodeData, NodeKind, Nodes, Type, TypeData, TypeSentinel, Types, combine_types,
+        self, Sem, SemData, SemKind, Semantic, Type, TypeData, TypeSentinel, Types, combine_types,
     },
-    syntax::{self, Syn, SynData, Syns},
+    syntax::{self, Syn, SynData, Syntax},
     token::{self, Tokens},
 };
 
-pub fn parse(source: &str, tokens: &Tokens, syntax: &Syns) -> (Nodes, Types) {
+pub fn parse(source: &str, tokens: &Tokens, syntax: &Syntax) -> (Semantic, Types) {
     let mut parser = Parser {
         source,
         tokens,
         syntax,
-        nodes: Nodes::default(),
+        semantic: Semantic::default(),
         types: Types::default(),
     };
     parser.parse_root();
-    (parser.nodes, parser.types)
+    (parser.semantic, parser.types)
 }
 
 struct Parser<'a> {
     source: &'a str,
     tokens: &'a Tokens,
-    syntax: &'a Syns,
+    syntax: &'a Syntax,
 
-    nodes: Nodes,
+    semantic: Semantic,
     types: Types,
 }
 
 impl Parser<'_> {
-    fn push(&mut self, kind: NodeKind) -> Node {
-        self.nodes.push(NodeData {
+    fn push(&mut self, kind: SemKind) -> Sem {
+        self.semantic.push(SemData {
             kind,
             ty: TypeSentinel::Unknown.to_index(),
         })
     }
 
     fn parse_root(&mut self) {
-        let Val::Value(SynData::Root(nodes)) = &self.syntax.get(syntax::ROOT_SYN) else {
+        let Val::Value(SynData::Root(sems)) = &self.syntax.get(syntax::ROOT_SYN) else {
             panic!();
         };
 
-        let root = self.nodes.push(NodeData {
-            kind: NodeKind::Module { bindings: vec![] },
+        let root = self.semantic.push(SemData {
+            kind: SemKind::Module { bindings: vec![] },
             ty: TypeSentinel::Unknown.to_index(),
         });
-        assert_eq!(root, semantic::ROOT_NODE);
+        assert_eq!(root, semantic::ROOT_SEM);
 
-        let bindings = nodes
+        let bindings = sems
             .iter()
-            .map(|&node| {
-                let Val::Value(SynData::Binding { pattern, value }) = self.syntax.get(node) else {
+            .map(|&sem| {
+                let Val::Value(SynData::Binding { pattern, value }) = self.syntax.get(sem) else {
                     panic!()
                 };
 
@@ -64,10 +64,10 @@ impl Parser<'_> {
             })
             .collect();
 
-        match self.nodes.get_mut(root) {
-            Val::Value(node_data) => {
-                *node_data = NodeData {
-                    kind: NodeKind::Module { bindings },
+        match self.semantic.get_mut(root) {
+            Val::Value(sem_data) => {
+                *sem_data = SemData {
+                    kind: SemKind::Module { bindings },
                     ty: TypeSentinel::Unknown.to_index(),
                 }
             }
@@ -75,27 +75,27 @@ impl Parser<'_> {
         };
     }
 
-    fn add_type(&mut self, node: Node, type_: Type) {
-        match self.nodes.get_mut(node) {
+    fn add_type(&mut self, sem: Sem, type_: Type) {
+        match self.semantic.get_mut(sem) {
             Val::None => panic!(),
-            Val::Value(node_data) => {
-                node_data.ty = combine_types(&mut self.types, node_data.ty, type_)
+            Val::Value(sem_data) => {
+                sem_data.ty = combine_types(&mut self.types, sem_data.ty, type_)
             }
         }
     }
 
-    fn parse_expression(&mut self, i: Syn) -> Node {
+    fn parse_expression(&mut self, i: Syn) -> Sem {
         match self.syntax.get(i) {
             Val::None => panic!(),
             Val::Value(syn_data) => match syn_data {
-                SynData::Ident(token) => self.push(NodeKind::Reference {
+                SynData::Ident(token) => self.push(SemKind::Reference {
                     name: token::parse_identifer(self.source, self.tokens, *token).to_string(),
                 }),
-                SynData::False(token) => self.push(NodeKind::False(*token)),
-                SynData::True(token) => self.push(NodeKind::True(*token)),
-                SynData::Number(token) => self.push(NodeKind::Number(*token)),
+                SynData::False(token) => self.push(SemKind::False(*token)),
+                SynData::True(token) => self.push(SemKind::True(*token)),
+                SynData::Number(token) => self.push(SemKind::Number(*token)),
                 SynData::Function { pattern, body } => {
-                    let param = self.push(NodeKind::Reference {
+                    let param = self.push(SemKind::Reference {
                         name: "__param".to_string(),
                     });
 
@@ -129,28 +129,28 @@ impl Parser<'_> {
                         return_type,
                     });
 
-                    let node = self.push(NodeKind::Function {
+                    let sem = self.push(SemKind::Function {
                         argument: "__param".to_string(),
                         body,
                     });
 
-                    self.add_type(node, ty);
+                    self.add_type(sem, ty);
 
-                    node
+                    sem
                 }
                 SynData::Add(lhs, rhs) => {
                     let lhs = self.parse_expression(*lhs);
                     let rhs = self.parse_expression(*rhs);
 
-                    let structure = self.push(NodeKind::BuildStruct {
+                    let structure = self.push(SemKind::BuildStruct {
                         fields: vec![("0".to_string(), lhs), ("1".to_string(), rhs)],
                     });
 
-                    let add_function = self.push(NodeKind::Reference {
+                    let add_function = self.push(SemKind::Reference {
                         name: "builtin_add".to_string(),
                     });
 
-                    self.push(NodeKind::Application {
+                    self.push(SemKind::Application {
                         function: add_function,
                         argument: structure,
                     })
@@ -158,17 +158,17 @@ impl Parser<'_> {
                 SynData::Application { function, argument } => {
                     let function = self.parse_expression(*function);
                     let argument = self.parse_expression(*argument);
-                    self.push(NodeKind::Application { function, argument })
+                    self.push(SemKind::Application { function, argument })
                 }
                 SynData::Loop(body) => {
                     let body = self.parse_expression(*body);
-                    self.push(NodeKind::Loop(body))
+                    self.push(SemKind::Loop(body))
                 }
                 SynData::If { condition, then } => {
                     let condition = self.parse_expression(*condition);
                     let then = self.parse_expression(*then);
 
-                    self.push(NodeKind::If { condition, then })
+                    self.push(SemKind::If { condition, then })
                 }
                 SynData::IfElse {
                     condition,
@@ -179,20 +179,20 @@ impl Parser<'_> {
                     let then = self.parse_expression(*then);
                     let else_ = self.parse_expression(*else_);
 
-                    self.push(NodeKind::IfElse {
+                    self.push(SemKind::IfElse {
                         condition,
                         then,
                         else_,
                     })
                 }
                 SynData::Paren(expr) => self.parse_expression(*expr),
-                SynData::Tuple(nodes) => {
-                    let fields = nodes
+                SynData::Tuple(sems) => {
+                    let fields = sems
                         .iter()
                         .enumerate()
-                        .map(|(i, node)| (i.to_string(), self.parse_expression(*node)))
+                        .map(|(i, sem)| (i.to_string(), self.parse_expression(*sem)))
                         .collect();
-                    self.push(NodeKind::BuildStruct { fields })
+                    self.push(SemKind::BuildStruct { fields })
                 }
                 SynData::Ascription { syn, type_ } => {
                     let expression = self.parse_expression(*syn);
@@ -207,7 +207,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_chain(&mut self, mut syns: impl Iterator<Item = Syn>, closed: bool) -> Node {
+    fn parse_chain(&mut self, mut syns: impl Iterator<Item = Syn>, closed: bool) -> Sem {
         let mut expressions = Vec::new();
 
         while let Some(syn) = syns.next() {
@@ -226,7 +226,7 @@ impl Parser<'_> {
         }
 
         if closed {
-            self.push(NodeKind::ChainClosed {
+            self.push(SemKind::ChainClosed {
                 statements: expressions,
             })
         } else {
@@ -234,19 +234,19 @@ impl Parser<'_> {
                 panic!();
             };
 
-            self.push(NodeKind::ChainOpen {
+            self.push(SemKind::ChainOpen {
                 statements: statements.to_vec(),
                 expression: *expression,
             })
         }
     }
 
-    fn sift_through_pattern(&mut self, value: Node, pattern: Syn, body: Node) -> (Node, Type) {
+    fn sift_through_pattern(&mut self, value: Sem, pattern: Syn, body: Sem) -> (Sem, Type) {
         match self.syntax.get(pattern) {
             Val::None => panic!(),
             Val::Value(syn_data) => match syn_data {
                 SynData::Ident(token) => (
-                    self.push(NodeKind::Binding {
+                    self.push(SemKind::Binding {
                         name: token::parse_identifer(self.source, self.tokens, *token).to_string(),
                         value,
                         body,
@@ -264,17 +264,17 @@ impl Parser<'_> {
                     (self.sift_through_pattern(value, *syn, body).0, type_)
                 }
                 // TODO: handle named fields
-                SynData::Tuple(nodes) => {
+                SynData::Tuple(sems) => {
                     let mut body = body;
-                    let mut fields_types = Vec::with_capacity(nodes.len());
+                    let mut fields_types = Vec::with_capacity(sems.len());
 
-                    for (i, node) in nodes.iter().enumerate().rev() {
-                        let field = self.push(NodeKind::Access {
+                    for (i, sem) in sems.iter().enumerate().rev() {
+                        let field = self.push(SemKind::Access {
                             field: i.to_string(),
                             expr: value,
                         });
 
-                        let (field, field_type) = self.sift_through_pattern(field, *node, body);
+                        let (field, field_type) = self.sift_through_pattern(field, *sem, body);
 
                         fields_types.push((i.to_string(), field_type));
 
@@ -316,11 +316,11 @@ impl Parser<'_> {
                 }
                 SynData::EmptyParen(_) => self.types.push(TypeData::Product { fields: Vec::new() }),
                 SynData::Paren(expr) => self.parse_type(*expr),
-                SynData::Tuple(nodes) => {
-                    let fields = nodes
+                SynData::Tuple(sems) => {
+                    let fields = sems
                         .iter()
                         .enumerate()
-                        .map(|(i, node)| (i.to_string(), self.parse_type(*node)))
+                        .map(|(i, sem)| (i.to_string(), self.parse_type(*sem)))
                         .collect();
                     self.types.push(TypeData::Product { fields })
                 }

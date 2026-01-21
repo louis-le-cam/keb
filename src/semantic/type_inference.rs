@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use crate::{
     key_vec::{Sentinel, Val},
-    semantic::{self, Node, NodeKind, Nodes, Type, TypeData, TypeSentinel, Types, combine_types},
+    semantic::{self, Sem, SemKind, Semantic, Type, TypeData, TypeSentinel, Types, combine_types},
 };
 
-pub fn infer_types(nodes: &mut Nodes, types: &mut Types) {
-    let mut inferrer = Inferrer { nodes, types };
+pub fn infer_types(semantic: &mut Semantic, types: &mut Types) {
+    let mut inferrer = Inferrer { semantic, types };
 
     inferrer.infer_root();
 }
@@ -15,13 +15,13 @@ type Scope = HashMap<String, ScopeItem>;
 
 #[derive(Clone, Debug)]
 enum ScopeItem {
-    Node(Node),
-    Argument(Node),
+    Sem(Sem),
+    Argument(Sem),
     Type(Type),
 }
 
 struct Inferrer<'a> {
-    nodes: &'a mut Nodes,
+    semantic: &'a mut Semantic,
     types: &'a mut Types,
 }
 
@@ -48,41 +48,41 @@ impl Inferrer<'_> {
             ("builtin_add".to_string(), ScopeItem::Type(builtin_add)),
             ("print".to_string(), ScopeItem::Type(print)),
         ]);
-        self.infer_expression(&scope, semantic::ROOT_NODE);
+        self.infer_expression(&scope, semantic::ROOT_SEM);
     }
 
-    fn add_type(&mut self, node: Node, type_: Type) {
-        match self.nodes.get_mut(node) {
+    fn add_type(&mut self, sem: Sem, type_: Type) {
+        match self.semantic.get_mut(sem) {
             Val::None => panic!(),
-            Val::Value(node_data) => node_data.ty = combine_types(self.types, node_data.ty, type_),
+            Val::Value(sem_data) => sem_data.ty = combine_types(self.types, sem_data.ty, type_),
         }
     }
 
-    fn infer_expression(&mut self, scope: &Scope, i: Node) {
-        match self.nodes.get_mut(i) {
-            Val::Value(node_data) => match &node_data.kind {
-                NodeKind::Number { .. } => self.add_type(i, TypeSentinel::Uint32.to_index()),
-                NodeKind::False { .. } => self.add_type(i, TypeSentinel::False.to_index()),
-                NodeKind::True { .. } => self.add_type(i, TypeSentinel::True.to_index()),
-                NodeKind::Module { bindings } => {
+    fn infer_expression(&mut self, scope: &Scope, i: Sem) {
+        match self.semantic.get_mut(i) {
+            Val::Value(sem_data) => match &sem_data.kind {
+                SemKind::Number { .. } => self.add_type(i, TypeSentinel::Uint32.to_index()),
+                SemKind::False { .. } => self.add_type(i, TypeSentinel::False.to_index()),
+                SemKind::True { .. } => self.add_type(i, TypeSentinel::True.to_index()),
+                SemKind::Module { bindings } => {
                     let bindings = bindings.clone();
 
                     let mut scope = scope.clone();
-                    for (name, node) in &bindings {
-                        scope.insert(name.clone(), ScopeItem::Node(*node));
+                    for (name, sem) in &bindings {
+                        scope.insert(name.clone(), ScopeItem::Sem(*sem));
                     }
 
-                    for (_, node) in &bindings {
-                        self.infer_expression(&scope, *node);
+                    for (_, sem) in &bindings {
+                        self.infer_expression(&scope, *sem);
                     }
 
                     let fields = bindings
                         .iter()
                         .map(|(name, value)| {
                             (name.clone(), {
-                                match self.nodes.get(*value) {
+                                match self.semantic.get(*value) {
                                     Val::None => panic!(),
-                                    Val::Value(node_data) => node_data.ty,
+                                    Val::Value(sem_data) => sem_data.ty,
                                 }
                             })
                         })
@@ -91,16 +91,16 @@ impl Inferrer<'_> {
                     let type_ = self.types.push(TypeData::Product { fields });
                     self.add_type(i, type_);
                 }
-                NodeKind::Function { argument, body } => {
+                SemKind::Function { argument, body } => {
                     let body = *body;
 
                     let mut scope = scope.clone();
                     scope.insert(argument.clone(), ScopeItem::Argument(i));
 
                     {
-                        let (argument_type, return_type) = match self.nodes.get(i) {
+                        let (argument_type, return_type) = match self.semantic.get(i) {
                             Val::None => panic!(),
-                            Val::Value(node_data) => match self.types.get(node_data.ty) {
+                            Val::Value(sem_data) => match self.types.get(sem_data.ty) {
                                 Val::None => panic!(),
                                 Val::Sentinel(_) => panic!(),
                                 Val::Value(type_data) => match type_data {
@@ -113,9 +113,9 @@ impl Inferrer<'_> {
                             },
                         };
 
-                        let body_type = match self.nodes.get(body) {
+                        let body_type = match self.semantic.get(body) {
                             Val::None => panic!(),
-                            Val::Value(node_data) => node_data.ty,
+                            Val::Value(sem_data) => sem_data.ty,
                         };
 
                         let return_type = combine_types(&mut self.types, body_type, return_type);
@@ -130,12 +130,12 @@ impl Inferrer<'_> {
                     self.infer_expression(&scope, body);
 
                     {
-                        let node_type = match self.nodes.get(i) {
+                        let sem_type = match self.semantic.get(i) {
                             Val::None => panic!(),
-                            Val::Value(node_data) => node_data.ty,
+                            Val::Value(sem_data) => sem_data.ty,
                         };
 
-                        let (argument_type, return_type) = match &self.types.get(node_type) {
+                        let (argument_type, return_type) = match &self.types.get(sem_type) {
                             Val::Value(TypeData::Function {
                                 argument_type,
                                 return_type,
@@ -146,9 +146,9 @@ impl Inferrer<'_> {
                             ),
                         };
 
-                        let body_type = match self.nodes.get(body) {
+                        let body_type = match self.semantic.get(body) {
                             Val::None => panic!(),
-                            Val::Value(node_data) => node_data.ty,
+                            Val::Value(sem_data) => sem_data.ty,
                         };
 
                         let return_type = combine_types(self.types, body_type, return_type);
@@ -160,7 +160,7 @@ impl Inferrer<'_> {
                         self.add_type(i, type_);
                     }
                 }
-                NodeKind::Binding { name, value, body } => {
+                SemKind::Binding { name, value, body } => {
                     let name = name.clone();
                     let value = *value;
                     let body = *body;
@@ -168,25 +168,25 @@ impl Inferrer<'_> {
                     self.infer_expression(scope, value);
 
                     let mut scope = scope.clone();
-                    scope.insert(name, ScopeItem::Node(value));
+                    scope.insert(name, ScopeItem::Sem(value));
 
                     self.infer_expression(&scope, body);
 
-                    let body_type = match self.nodes.get(body) {
+                    let body_type = match self.semantic.get(body) {
                         Val::None => panic!(),
-                        Val::Value(node_data) => node_data.ty,
+                        Val::Value(sem_data) => sem_data.ty,
                     };
 
                     self.add_type(i, body_type);
                 }
-                NodeKind::Reference { name } => {
+                SemKind::Reference { name } => {
                     let type_ = match scope[name] {
-                        ScopeItem::Node(node) => match self.nodes.get(node) {
-                            Val::Value(node_data) => node_data.ty,
+                        ScopeItem::Sem(sem) => match self.semantic.get(sem) {
+                            Val::Value(sem_data) => sem_data.ty,
                             Val::None => panic!(),
                         },
-                        ScopeItem::Argument(node) => match self.nodes.get(node) {
-                            Val::Value(node_data) => match self.types.get(node_data.ty) {
+                        ScopeItem::Argument(sem) => match self.semantic.get(sem) {
+                            Val::Value(sem_data) => match self.types.get(sem_data.ty) {
                                 Val::Value(TypeData::Function { argument_type, .. }) => {
                                     *argument_type
                                 }
@@ -199,14 +199,14 @@ impl Inferrer<'_> {
 
                     self.add_type(i, type_);
                 }
-                NodeKind::Access { field, expr } => {
+                SemKind::Access { field, expr } => {
                     let field = field.clone();
                     let expr = *expr;
 
                     self.infer_expression(scope, expr);
 
-                    let expr_data = match self.nodes.get_mut(expr) {
-                        Val::Value(node_data) => node_data,
+                    let expr_data = match self.semantic.get_mut(expr) {
+                        Val::Value(sem_data) => sem_data,
                         Val::None => panic!(),
                     };
 
@@ -228,32 +228,32 @@ impl Inferrer<'_> {
                         },
                     }
                 }
-                NodeKind::Application { function, argument } => {
+                SemKind::Application { function, argument } => {
                     let function = *function;
                     let argument = *argument;
 
                     self.infer_expression(scope, function);
                     self.infer_expression(scope, argument);
 
-                    let function_node_data = match self.nodes.get_mut(function) {
+                    let function_sem_data = match self.semantic.get_mut(function) {
                         Val::None => panic!(),
-                        Val::Value(node_data) => node_data,
+                        Val::Value(sem_data) => sem_data,
                     };
 
-                    match self.types.get(function_node_data.ty) {
+                    match self.types.get(function_sem_data.ty) {
                         Val::Value(TypeData::Function { return_type, .. }) => {
                             self.add_type(i, *return_type);
                         }
                         Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
                     }
                 }
-                NodeKind::Loop(body) => {
+                SemKind::Loop(body) => {
                     let body = *body;
                     self.infer_expression(scope, body);
                     // TODO: When we add `break`, the type inference should infer based on them
                     self.add_type(i, TypeSentinel::Unit.to_index());
                 }
-                NodeKind::If { condition, then } => {
+                SemKind::If { condition, then } => {
                     let condition = *condition;
                     let then = *then;
 
@@ -262,7 +262,7 @@ impl Inferrer<'_> {
                     self.add_type(then, TypeSentinel::Unit.to_index());
                     self.add_type(i, TypeSentinel::Unit.to_index());
                 }
-                NodeKind::IfElse {
+                SemKind::IfElse {
                     condition,
                     then,
                     else_,
@@ -276,20 +276,20 @@ impl Inferrer<'_> {
                     self.infer_expression(scope, then);
                     self.infer_expression(scope, else_);
 
-                    let then_type = match self.nodes.get(then) {
+                    let then_type = match self.semantic.get(then) {
                         Val::None => panic!(),
-                        Val::Value(node_data) => node_data.ty,
+                        Val::Value(sem_data) => sem_data.ty,
                     };
-                    let else_type = match self.nodes.get(then) {
+                    let else_type = match self.semantic.get(then) {
                         Val::None => panic!(),
-                        Val::Value(node_data) => node_data.ty,
+                        Val::Value(sem_data) => sem_data.ty,
                     };
 
                     self.add_type(then, else_type);
                     self.add_type(else_, then_type);
                     self.add_type(i, then_type);
                 }
-                NodeKind::BuildStruct { fields } => {
+                SemKind::BuildStruct { fields } => {
                     let fields = fields.clone();
                     for (_, value) in &fields {
                         self.infer_expression(scope, *value);
@@ -301,9 +301,9 @@ impl Inferrer<'_> {
                             .map(|(name, value)| {
                                 (
                                     name.clone(),
-                                    match self.nodes.get(*value) {
+                                    match self.semantic.get(*value) {
                                         Val::None => panic!(),
-                                        Val::Value(node_data) => node_data.ty,
+                                        Val::Value(sem_data) => sem_data.ty,
                                     },
                                 )
                             })
@@ -312,7 +312,7 @@ impl Inferrer<'_> {
 
                     self.add_type(i, type_);
                 }
-                NodeKind::ChainOpen {
+                SemKind::ChainOpen {
                     statements,
                     expression,
                 } => {
@@ -324,11 +324,11 @@ impl Inferrer<'_> {
 
                     self.infer_expression(scope, expression);
 
-                    if let Val::Value(node_data) = self.nodes.get(expression) {
-                        self.add_type(i, node_data.ty);
+                    if let Val::Value(sem_data) = self.semantic.get(expression) {
+                        self.add_type(i, sem_data.ty);
                     }
                 }
-                NodeKind::ChainClosed { statements } => {
+                SemKind::ChainClosed { statements } => {
                     for statement in statements.clone() {
                         self.infer_expression(scope, statement);
                     }

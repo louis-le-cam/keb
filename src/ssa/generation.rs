@@ -2,17 +2,17 @@ use std::collections::HashMap;
 
 use crate::{
     key_vec::{Sentinel, Val},
-    semantic::{self, Node, NodeData, NodeKind, Nodes, TypeData, TypeSentinel, Types},
+    semantic::{self, Sem, SemData, SemKind, Semantic, TypeData, TypeSentinel, Types},
     token::{self, Tokens},
 };
 
 use super::*;
 
-pub fn generate(source: &str, tokens: &Tokens, semantic: &Nodes, types: &mut Types) -> Ssa {
-    let Val::Value(NodeData {
-        kind: NodeKind::Module { bindings },
+pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut Types) -> Ssa {
+    let Val::Value(SemData {
+        kind: SemKind::Module { bindings },
         ..
-    }) = &semantic.get(semantic::ROOT_NODE)
+    }) = &semantic.get(semantic::ROOT_SEM)
     else {
         panic!();
     };
@@ -52,8 +52,8 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Nodes, types: &mut Typ
     ]);
 
     for (name, value) in bindings {
-        let Val::Value(NodeData {
-            kind: NodeKind::Function { .. },
+        let Val::Value(SemData {
+            kind: SemKind::Function { .. },
             ty,
         }) = &semantic.get(*value)
         else {
@@ -75,8 +75,8 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Nodes, types: &mut Typ
     }
 
     for (name, value) in bindings {
-        let Val::Value(NodeData {
-            kind: NodeKind::Function { argument, body },
+        let Val::Value(SemData {
+            kind: SemKind::Function { argument, body },
             ..
         }) = &semantic.get(*value)
         else {
@@ -100,24 +100,24 @@ fn generate_expression(
     block: &mut Block,
     source: &str,
     tokens: &Tokens,
-    semantic: &Nodes,
+    semantic: &Semantic,
     types: &mut Types,
-    node: Node,
+    sem: Sem,
     bindings: &HashMap<String, Expr>,
     functions: &HashMap<String, Block>,
 ) -> Expr {
-    match semantic.get(node) {
+    match semantic.get(sem) {
         Val::None => panic!(),
-        Val::Value(node_data) => match &node_data.kind {
-            NodeKind::Number(token) => {
+        Val::Value(sem_data) => match &sem_data.kind {
+            SemKind::Number(token) => {
                 let value = token::parse_u64(source, tokens, *token) as u32;
                 Expr::Const(ssa.const_u32(value))
             }
-            NodeKind::False(_) => Expr::Const(ConstSentinel::False.to_index()),
-            NodeKind::True(_) => Expr::Const(ConstSentinel::True.to_index()),
-            NodeKind::Module { .. } => todo!(),
-            NodeKind::Function { .. } => todo!(),
-            NodeKind::Binding { name, value, body } => {
+            SemKind::False(_) => Expr::Const(ConstSentinel::False.to_index()),
+            SemKind::True(_) => Expr::Const(ConstSentinel::True.to_index()),
+            SemKind::Module { .. } => todo!(),
+            SemKind::Function { .. } => todo!(),
+            SemKind::Binding { name, value, body } => {
                 let value = generate_expression(
                     ssa, block, source, tokens, semantic, types, *value, bindings, functions,
                 );
@@ -128,9 +128,9 @@ fn generate_expression(
                     ssa, block, source, tokens, semantic, types, *body, &bindings, functions,
                 )
             }
-            NodeKind::Reference { name } => bindings[name],
-            NodeKind::Access { field, expr } => {
-                let Val::Value(NodeData { ty, .. }) = semantic.get(*expr) else {
+            SemKind::Reference { name } => bindings[name],
+            SemKind::Access { field, expr } => {
+                let Val::Value(SemData { ty, .. }) = semantic.get(*expr) else {
                     panic!()
                 };
 
@@ -147,13 +147,13 @@ fn generate_expression(
 
                 Expr::Inst(ssa.inst_field(*block, expr, field_index as u32))
             }
-            NodeKind::Application { function, argument } => {
+            SemKind::Application { function, argument } => {
                 let argument = generate_expression(
                     ssa, block, source, tokens, semantic, types, *argument, bindings, functions,
                 );
 
-                let Val::Value(NodeData {
-                    kind: NodeKind::Reference { name },
+                let Val::Value(SemData {
+                    kind: SemKind::Reference { name },
                     ..
                 }) = &semantic.get(*function)
                 else {
@@ -162,7 +162,7 @@ fn generate_expression(
 
                 Expr::Inst(ssa.inst_call(*block, functions[name], argument))
             }
-            NodeKind::Loop(body) => {
+            SemKind::Loop(body) => {
                 let loop_block = ssa.basic_block(TypeSentinel::Unit.to_index());
                 ssa.inst_jump(
                     *block,
@@ -178,7 +178,7 @@ fn generate_expression(
                 ssa.inst_jump(*block, *block, Expr::Const(ConstSentinel::Unit.to_index()));
                 Expr::Const(ConstSentinel::Unit.to_index())
             }
-            NodeKind::If { condition, then } => {
+            SemKind::If { condition, then } => {
                 let condition = generate_expression(
                     ssa, block, source, tokens, semantic, types, *condition, bindings, functions,
                 );
@@ -210,7 +210,7 @@ fn generate_expression(
 
                 Expr::Const(ConstSentinel::Unit.to_index())
             }
-            NodeKind::IfElse {
+            SemKind::IfElse {
                 condition,
                 then,
                 else_,
@@ -248,7 +248,7 @@ fn generate_expression(
                     functions,
                 );
 
-                let Val::Value(NodeData { ty: type_, kind: _ }) = semantic.get(*then) else {
+                let Val::Value(SemData { ty: type_, kind: _ }) = semantic.get(*then) else {
                     panic!()
                 };
 
@@ -260,7 +260,7 @@ fn generate_expression(
 
                 Expr::BlockArg(after_block)
             }
-            NodeKind::BuildStruct { fields } => {
+            SemKind::BuildStruct { fields } => {
                 let fields = fields
                     .iter()
                     .map(|(_, value)| {
@@ -273,7 +273,7 @@ fn generate_expression(
 
                 Expr::Inst(ssa.inst_product(types, *block, fields))
             }
-            NodeKind::ChainOpen {
+            SemKind::ChainOpen {
                 statements,
                 expression,
             } => {
@@ -296,7 +296,7 @@ fn generate_expression(
                     functions,
                 )
             }
-            NodeKind::ChainClosed { statements } => {
+            SemKind::ChainClosed { statements } => {
                 for statement in statements {
                     generate_expression(
                         ssa, block, source, tokens, semantic, types, *statement, bindings,

@@ -5,6 +5,9 @@ use crate::{
 
 #[derive(Debug)]
 pub enum SynData {
+    // TODO: Find a solution to avoid nested allocation from the [`Vec<Syn>`],
+    // maybe reference a range of syns (with a start and a length) in the main
+    // vector.
     Root(Vec<Syn>),
     Ident(Token),
     False(Token),
@@ -36,6 +39,9 @@ pub enum SynData {
     Paren(Syn),
     EmptyCurly(Token),
     Curly(Syn),
+    // TODO: Find a solution to avoid nested allocation from the [`Vec<Syn>`],
+    // maybe reference a range of syns (with a start and a length) in the main
+    // vector.
     Tuple(Vec<Syn>),
     Application {
         function: Syn,
@@ -55,6 +61,9 @@ pub enum SynData {
     // maybe reference a range of syns (with a start and a length) in the main
     // vector.
     ChainOpen(Vec<Syn>),
+    // TODO: Find a solution to avoid nested allocation from the [`Vec<Syn>`],
+    // maybe reference a range of syns (with a start and a length) in the main
+    // vector.
     ChainClosed(Vec<Syn>),
 }
 
@@ -62,6 +71,6 @@ pub enum SynData {
 pub enum SynSentinel {}
 
 pub type Syn = Index<SynSentinel>;
-pub type Syns = KeyVec<SynSentinel, SynData>;
+pub type Syntax = KeyVec<SynSentinel, SynData>;
 
 pub const ROOT_SYN: Syn = Syn::from_u32_index(0);

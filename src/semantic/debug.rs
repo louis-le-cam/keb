@@ -2,32 +2,32 @@ use colored::Colorize as _;
 
 use crate::{
     key_vec::Val,
-    semantic::{Node, NodeKind, Nodes, ROOT_NODE, TypeSentinel, Types},
+    semantic::{ROOT_SEM, Sem, SemKind, Semantic, TypeSentinel, Types},
 };
 
-pub fn debug(nodes: &Nodes, types: &Types) {
+pub fn debug(semantic: &Semantic, types: &Types) {
     println!(
         "{:#?}",
-        DebugNode {
-            nodes,
+        DebugSem {
+            semantic,
             types,
-            node: ROOT_NODE
+            sem: ROOT_SEM
         }
     );
 }
 
-struct DebugNode<'a> {
-    nodes: &'a Nodes,
+struct DebugSem<'a> {
+    semantic: &'a Semantic,
     types: &'a Types,
-    node: Node,
+    sem: Sem,
 }
 
-impl std::fmt::Debug for DebugNode<'_> {
+impl std::fmt::Debug for DebugSem<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let node = |node| DebugNode {
-            nodes: self.nodes,
+        let sem = |sem| DebugSem {
+            semantic: self.semantic,
             types: self.types,
-            node,
+            sem,
         };
 
         let mut display = |name: &str, children: &[&dyn std::fmt::Debug]| {
@@ -40,47 +40,45 @@ impl std::fmt::Debug for DebugNode<'_> {
                 .finish()
         };
 
-        match self.nodes.get(self.node) {
+        match self.semantic.get(self.sem) {
             Val::None => panic!(),
-            Val::Value(node_data) => match &node_data.kind {
-                NodeKind::Number(token) => display("number", &[token]),
-                NodeKind::False(token) => display("false", &[token]),
-                NodeKind::True(token) => display("true", &[token]),
-                NodeKind::Module { bindings } => bindings
+            Val::Value(sem_data) => match &sem_data.kind {
+                SemKind::Number(token) => display("number", &[token]),
+                SemKind::False(token) => display("false", &[token]),
+                SemKind::True(token) => display("true", &[token]),
+                SemKind::Module { bindings } => bindings
                     .iter()
                     .fold(
                         &mut f.debug_struct("module".bright_green().to_string().as_str()),
-                        |structure, (name, value)| structure.field(name, &node(*value)),
+                        |structure, (name, value)| structure.field(name, &sem(*value)),
                     )
                     .finish(),
-                NodeKind::Function { argument, body } => {
-                    display("function", &[argument, &node(*body)])
+                SemKind::Function { argument, body } => {
+                    display("function", &[argument, &sem(*body)])
                 }
-                NodeKind::Binding { name, value, body } => {
-                    display("binding", &[name, &node(*value), &node(*body)])
+                SemKind::Binding { name, value, body } => {
+                    display("binding", &[name, &sem(*value), &sem(*body)])
                 }
-                NodeKind::Reference { name } => display("reference", &[name]),
-                NodeKind::Access { field, expr } => display("access", &[field, &node(*expr)]),
-                NodeKind::Application { function, argument } => {
-                    display("application", &[&node(*function), &node(*argument)])
+                SemKind::Reference { name } => display("reference", &[name]),
+                SemKind::Access { field, expr } => display("access", &[field, &sem(*expr)]),
+                SemKind::Application { function, argument } => {
+                    display("application", &[&sem(*function), &sem(*argument)])
                 }
-                NodeKind::Loop(body) => display("loop", &[&node(*body)]),
-                NodeKind::If { condition, then } => {
-                    display("if", &[&node(*condition), &node(*then)])
-                }
-                NodeKind::IfElse {
+                SemKind::Loop(body) => display("loop", &[&sem(*body)]),
+                SemKind::If { condition, then } => display("if", &[&sem(*condition), &sem(*then)]),
+                SemKind::IfElse {
                     condition,
                     then,
                     else_,
-                } => display("if", &[&node(*condition), &node(*then), &node(*else_)]),
-                NodeKind::BuildStruct { fields } => fields
+                } => display("if", &[&sem(*condition), &sem(*then), &sem(*else_)]),
+                SemKind::BuildStruct { fields } => fields
                     .iter()
                     .fold(
                         &mut f.debug_struct("build_struct".bright_green().to_string().as_str()),
-                        |structure, (name, value)| structure.field(name, &node(*value)),
+                        |structure, (name, value)| structure.field(name, &sem(*value)),
                     )
                     .finish(),
-                NodeKind::ChainOpen {
+                SemKind::ChainOpen {
                     statements,
                     expression,
                 } => statements
@@ -88,22 +86,22 @@ impl std::fmt::Debug for DebugNode<'_> {
                     .chain([expression])
                     .fold(
                         &mut f.debug_tuple("chain_open".bright_green().to_string().as_str()),
-                        |structure, expression| structure.field(&node(*expression)),
+                        |structure, expression| structure.field(&sem(*expression)),
                     )
                     .finish(),
-                NodeKind::ChainClosed { statements } => statements
+                SemKind::ChainClosed { statements } => statements
                     .iter()
                     .fold(
                         &mut f.debug_tuple("chain_closed".bright_green().to_string().as_str()),
-                        |structure, expression| structure.field(&node(*expression)),
+                        |structure, expression| structure.field(&sem(*expression)),
                     )
                     .finish(),
             },
         }?;
 
-        f.write_str(&match self.nodes.get(self.node) {
+        f.write_str(&match self.semantic.get(self.sem) {
             Val::None => panic!(),
-            Val::Value(node_data) => match self.types.get(node_data.ty) {
+            Val::Value(sem_data) => match self.types.get(sem_data.ty) {
                 Val::None => panic!(),
                 Val::Sentinel(sentinel) => match sentinel {
                     TypeSentinel::Unknown => ": unknown".bright_blue().to_string(),

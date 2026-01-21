@@ -2,32 +2,32 @@ use std::iter::Peekable;
 
 use crate::{
     key_vec::Val,
-    syntax::{self, Syn, SynData, Syns},
+    syntax::{self, Syn, SynData, Syntax},
     token::{Token, TokenKind, Tokens},
 };
 
-pub fn parse(tokens: &Tokens) -> Syns {
+pub fn parse(tokens: &Tokens) -> Syntax {
     let mut parser = Parser {
         tokens: tokens
             .entries()
             .map(|(token, (_, kind))| (token, *kind))
             .peekable(),
-        syns: Syns::default(),
+        syntax: Syntax::default(),
     };
 
     parser.parse_root();
 
-    parser.syns
+    parser.syntax
 }
 
 struct Parser<I: Iterator<Item = (Token, TokenKind)>> {
     tokens: Peekable<I>,
-    syns: Syns,
+    syntax: Syntax,
 }
 
 impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
     fn parse_root(&mut self) {
-        let root = self.syns.push(SynData::Root(Vec::new()));
+        let root = self.syntax.push(SynData::Root(Vec::new()));
         assert_eq!(root, syntax::ROOT_SYN);
 
         let syns = std::iter::from_fn(|| {
@@ -40,7 +40,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         })
         .collect();
 
-        match self.syns.get_mut(root) {
+        match self.syntax.get_mut(root) {
             Val::None => panic!(),
             Val::Value(syn_data) => *syn_data = SynData::Root(syns),
         }
@@ -69,7 +69,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             };
         };
 
-        Some(self.syns.push(if closed {
+        Some(self.syntax.push(if closed {
             SynData::ChainClosed(syns)
         } else {
             SynData::ChainOpen(syns)
@@ -85,10 +85,10 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         self.tokens.next();
 
-        let mut nodes = vec![syn];
+        let mut syns = vec![syn];
 
         loop {
-            nodes.push(self.parse_function().unwrap());
+            syns.push(self.parse_function().unwrap());
 
             match self.tokens.peek() {
                 Some((_, TokenKind::Comma)) => {}
@@ -96,7 +96,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             };
         }
 
-        Some(self.syns.push(SynData::Tuple(nodes)))
+        Some(self.syntax.push(SynData::Tuple(syns)))
     }
 
     fn parse_function(&mut self) -> Option<Syn> {
@@ -106,7 +106,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             Some((_, TokenKind::EqualGreater)) => {
                 self.tokens.next();
                 let body = self.parse_function().unwrap();
-                self.syns.push(SynData::Function { pattern: syn, body })
+                self.syntax.push(SynData::Function { pattern: syn, body })
             }
             _ => syn,
         })
@@ -119,7 +119,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             Some((_, TokenKind::HyphenGreater)) => {
                 self.tokens.next();
                 let type_ = self.parse_return_ascription().unwrap();
-                self.syns.push(SynData::ReturnAscription { syn, type_ })
+                self.syntax.push(SynData::ReturnAscription { syn, type_ })
             }
             _ => syn,
         })
@@ -129,7 +129,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         let syn = self.parse_additive()?;
 
         Some(match self.parse_application() {
-            Some(argument) => self.syns.push(SynData::Application {
+            Some(argument) => self.syntax.push(SynData::Application {
                 function: syn,
                 argument,
             }),
@@ -145,12 +145,12 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 Some((_, TokenKind::Plus)) => {
                     self.tokens.next();
                     let rhs = self.parse_ascription().unwrap();
-                    syn = self.syns.push(SynData::Add(syn, rhs))
+                    syn = self.syntax.push(SynData::Add(syn, rhs))
                 }
                 Some((_, TokenKind::Hyphen)) => {
                     self.tokens.next();
                     let rhs = self.parse_ascription().unwrap();
-                    syn = self.syns.push(SynData::Subtract(syn, rhs))
+                    syn = self.syntax.push(SynData::Subtract(syn, rhs))
                 }
                 _ => break,
             }
@@ -166,7 +166,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             Some((_, TokenKind::Colon)) => {
                 self.tokens.next();
                 let type_ = self.parse_ascription().unwrap();
-                self.syns.push(SynData::Ascription { syn, type_ })
+                self.syntax.push(SynData::Ascription { syn, type_ })
             }
             _ => syn,
         })
@@ -178,7 +178,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         while let Some((_, TokenKind::Dot)) = self.tokens.peek() {
             self.tokens.next();
             let key = self.parse_terminal().unwrap();
-            syn = self.syns.push(SynData::Access { syn, key });
+            syn = self.syntax.push(SynData::Access { syn, key });
         }
 
         Some(syn)
@@ -198,7 +198,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
                 let value = self.parse_tuple().unwrap();
 
-                self.syns.push(SynData::Binding {
+                self.syntax.push(SynData::Binding {
                     pattern: pattern,
                     value: value,
                 })
@@ -206,7 +206,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             TokenKind::Loop => {
                 self.tokens.next();
                 let body = self.parse_application().unwrap();
-                self.syns.push(SynData::Loop(body))
+                self.syntax.push(SynData::Loop(body))
             }
             TokenKind::If => {
                 self.tokens.next();
@@ -224,11 +224,11 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                     .next_if(|(_, token)| *token == TokenKind::Else)
                     .is_none()
                 {
-                    self.syns.push(SynData::If { condition, then })
+                    self.syntax.push(SynData::If { condition, then })
                 } else {
                     let else_ = self.parse_application().unwrap();
 
-                    self.syns.push(SynData::IfElse {
+                    self.syntax.push(SynData::IfElse {
                         condition,
                         then,
                         else_,
@@ -237,19 +237,19 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             }
             TokenKind::False => {
                 self.tokens.next();
-                self.syns.push(SynData::False(token))
+                self.syntax.push(SynData::False(token))
             }
             TokenKind::True => {
                 self.tokens.next();
-                self.syns.push(SynData::True(token))
+                self.syntax.push(SynData::True(token))
             }
             TokenKind::Ident => {
                 self.tokens.next();
-                self.syns.push(SynData::Ident(token))
+                self.syntax.push(SynData::Ident(token))
             }
             TokenKind::Number => {
                 self.tokens.next();
-                self.syns.push(SynData::Number(token))
+                self.syntax.push(SynData::Number(token))
             }
             TokenKind::LeftParen => {
                 self.tokens.next();
@@ -261,8 +261,8 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 };
 
                 match expr {
-                    Some(expr) => self.syns.push(SynData::Paren(expr)),
-                    None => self.syns.push(SynData::EmptyParen(token)),
+                    Some(expr) => self.syntax.push(SynData::Paren(expr)),
+                    None => self.syntax.push(SynData::EmptyParen(token)),
                 }
             }
             TokenKind::LeftCurly => {
@@ -275,8 +275,8 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 };
 
                 match expr {
-                    Some(expr) => self.syns.push(SynData::Curly(expr)),
-                    None => self.syns.push(SynData::EmptyCurly(token)),
+                    Some(expr) => self.syntax.push(SynData::Curly(expr)),
+                    None => self.syntax.push(SynData::EmptyCurly(token)),
                 }
             }
             TokenKind::Then

@@ -4,12 +4,12 @@ use colored::Colorize;
 
 use crate::{
     key_vec::Val,
-    syntax::{ROOT_SYN, Syn, SynData, Syns},
+    syntax::{ROOT_SYN, Syn, SynData, Syntax},
 };
 
-pub fn debug(syns: &Syns) {
+pub fn debug(syntax: &Syntax) {
     struct DebugSyn<'a> {
-        syns: &'a Syns,
+        syntax: &'a Syntax,
         syn: Syn,
     }
 
@@ -17,12 +17,12 @@ pub fn debug(syns: &Syns) {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let dbg_syn = |syn| {
                 DebugWrapper(DebugSyn {
-                    syns: self.syns,
+                    syntax: self.syntax,
                     syn,
                 })
             };
 
-            match self.syns.get(self.syn) {
+            match self.syntax.get(self.syn) {
                 Val::None => panic!(),
                 Val::Value(syn_data) => match syn_data {
                     SynData::Root(syns) => syns
@@ -149,7 +149,7 @@ pub fn debug(syns: &Syns) {
     println!(
         "{:#?}",
         DebugSyn {
-            syns,
+            syntax,
             syn: ROOT_SYN,
         }
     );
