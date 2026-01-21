@@ -2,7 +2,7 @@ use std::iter::Peekable;
 
 use crate::{
     key_vec::Val,
-    syntax::{self, Syn, SynData, Syntax},
+    syntax::{self, StringSegment, Syn, SynData, Syntax},
     token::{Token, TokenKind, Tokens},
 };
 
@@ -251,7 +251,30 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 self.tokens.next();
                 self.syntax.push(SynData::Number(token))
             }
-            TokenKind::StringStart => todo!(),
+            TokenKind::StringStart => {
+                self.tokens.next();
+
+                let mut segments = Vec::new();
+
+                loop {
+                    let (token, token_kind) = self.tokens.next().unwrap();
+                    match token_kind {
+                        TokenKind::StringSegment | TokenKind::StringEscape => {
+                            segments.push(StringSegment::Token(token))
+                        }
+                        TokenKind::InterpolationStart => {
+                            segments
+                                .push(StringSegment::Interpolation(self.parse_chain().unwrap()));
+
+                            let Some((_, TokenKind::InterpolationEnd)) = self.tokens.next() else {
+                                panic!();
+                            };
+                        }
+                        TokenKind::StringEnd => break self.syntax.push(SynData::String(segments)),
+                        _ => panic!(),
+                    }
+                }
+            }
             TokenKind::LeftParen => {
                 self.tokens.next();
 

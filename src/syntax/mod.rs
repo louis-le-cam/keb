@@ -5,5 +5,5 @@ mod syn;
 pub use self::{
     debug::debug,
     parser::parse,
-    syn::{ROOT_SYN, Syn, SynData, Syntax},
+    syn::{ROOT_SYN, StringSegment, Syn, SynData, SynSentinel, Syntax},
 };

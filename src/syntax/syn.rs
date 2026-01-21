@@ -65,6 +65,14 @@ pub enum SynData {
     // maybe reference a range of syns (with a start and a length) in the main
     // vector.
     ChainClosed(Vec<Syn>),
+    // TODO: Find a solution to avoid nested allocation.
+    String(Vec<StringSegment>),
+}
+
+#[derive(Debug)]
+pub enum StringSegment {
+    Token(Token),
+    Interpolation(Syn),
 }
 
 #[derive(Sentinel, Clone, Copy, Debug)]

@@ -4,7 +4,7 @@ use colored::Colorize;
 
 use crate::{
     key_vec::Val,
-    syntax::{ROOT_SYN, Syn, SynData, Syntax},
+    syntax::{ROOT_SYN, StringSegment, Syn, SynData, Syntax},
 };
 
 pub fn debug(syntax: &Syntax) {
@@ -139,6 +139,16 @@ pub fn debug(syntax: &Syntax) {
                         .fold(
                             &mut f.debug_tuple(&"chain_closed".white().to_string()),
                             |tuple, expr| tuple.field(&dbg_syn(*expr)),
+                        )
+                        .finish(),
+                    SynData::String(segments) => segments
+                        .iter()
+                        .fold(
+                            &mut f.debug_tuple(&"chain_closed".white().to_string()),
+                            |tuple, segment| match segment {
+                                StringSegment::Token(token) => tuple.field(&token),
+                                StringSegment::Interpolation(syn) => tuple.field(&dbg_syn(*syn)),
+                            },
                         )
                         .finish(),
                 },
