@@ -202,6 +202,9 @@ impl Parser<'_> {
                 }
                 SynData::ChainOpen(syns) => self.parse_chain(syns.iter().copied(), false),
                 SynData::ChainClosed(syns) => self.parse_chain(syns.iter().copied(), true),
+                SynData::String(_segments) => todo!(
+                    "Implement string in the semantic phase, needs careful thought on interpolation"
+                ),
                 expr => panic!("{expr:?}"),
             },
         }
