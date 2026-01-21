@@ -187,54 +187,24 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
     fn parse_terminal(&mut self) -> Option<Syn> {
         let &(token, kind) = self.tokens.peek()?;
         Some(match kind {
-            TokenKind::Let => {
+            TokenKind::LeftParen => self.parse_paren(),
+            TokenKind::LeftCurly => self.parse_curly(),
+
+            TokenKind::Number => {
                 self.tokens.next();
-
-                let pattern = self.parse_chain().unwrap();
-
-                let Some((_, TokenKind::Equal)) = self.tokens.next() else {
-                    panic!();
-                };
-
-                let value = self.parse_tuple().unwrap();
-
-                self.syntax.push(SynData::Binding {
-                    pattern: pattern,
-                    value: value,
-                })
+                self.syntax.push(SynData::Number(token))
             }
+            TokenKind::Ident => {
+                self.tokens.next();
+                self.syntax.push(SynData::Ident(token))
+            }
+            TokenKind::Let => self.parse_let(),
             TokenKind::Loop => {
                 self.tokens.next();
                 let body = self.parse_application().unwrap();
                 self.syntax.push(SynData::Loop(body))
             }
-            TokenKind::If => {
-                self.tokens.next();
-
-                let condition = self.parse_application().unwrap();
-
-                let Some((_, TokenKind::Then)) = self.tokens.next() else {
-                    panic!()
-                };
-
-                let then = self.parse_application().unwrap();
-
-                if self
-                    .tokens
-                    .next_if(|(_, token)| *token == TokenKind::Else)
-                    .is_none()
-                {
-                    self.syntax.push(SynData::If { condition, then })
-                } else {
-                    let else_ = self.parse_application().unwrap();
-
-                    self.syntax.push(SynData::IfElse {
-                        condition,
-                        then,
-                        else_,
-                    })
-                }
-            }
+            TokenKind::If => self.parse_if(),
             TokenKind::False => {
                 self.tokens.next();
                 self.syntax.push(SynData::False(token))
@@ -243,84 +213,136 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 self.tokens.next();
                 self.syntax.push(SynData::True(token))
             }
-            TokenKind::Ident => {
-                self.tokens.next();
-                self.syntax.push(SynData::Ident(token))
-            }
-            TokenKind::Number => {
-                self.tokens.next();
-                self.syntax.push(SynData::Number(token))
-            }
-            TokenKind::StringStart => {
-                self.tokens.next();
 
-                let mut segments = Vec::new();
+            TokenKind::StringStart => self.parse_string(),
 
-                loop {
-                    let (token, token_kind) = self.tokens.next().unwrap();
-                    match token_kind {
-                        TokenKind::StringSegment | TokenKind::StringEscape => {
-                            segments.push(StringSegment::Token(token))
-                        }
-                        TokenKind::InterpolationStart => {
-                            segments
-                                .push(StringSegment::Interpolation(self.parse_chain().unwrap()));
-
-                            let Some((_, TokenKind::InterpolationEnd)) = self.tokens.next() else {
-                                panic!();
-                            };
-                        }
-                        TokenKind::StringEnd => break self.syntax.push(SynData::String(segments)),
-                        _ => panic!(),
-                    }
-                }
-            }
-            TokenKind::LeftParen => {
-                self.tokens.next();
-
-                let expr = self.parse_chain();
-
-                let Some((_, TokenKind::RightParen)) = self.tokens.next() else {
-                    panic!();
-                };
-
-                match expr {
-                    Some(expr) => self.syntax.push(SynData::Paren(expr)),
-                    None => self.syntax.push(SynData::EmptyParen(token)),
-                }
-            }
-            TokenKind::LeftCurly => {
-                self.tokens.next();
-
-                let expr = self.parse_chain();
-
-                let Some((_, TokenKind::RightCurly)) = self.tokens.next() else {
-                    panic!();
-                };
-
-                match expr {
-                    Some(expr) => self.syntax.push(SynData::Curly(expr)),
-                    None => self.syntax.push(SynData::EmptyCurly(token)),
-                }
-            }
-            TokenKind::Then
-            | TokenKind::Else
-            | TokenKind::EqualGreater
-            | TokenKind::Equal
-            | TokenKind::Plus
+            TokenKind::EqualGreater
             | TokenKind::HyphenGreater
+            | TokenKind::Equal
             | TokenKind::Hyphen
+            | TokenKind::Plus
             | TokenKind::Comma
             | TokenKind::Semicolon
             | TokenKind::Colon
             | TokenKind::Dot
             | TokenKind::RightParen
             | TokenKind::RightCurly
+            | TokenKind::Then
+            | TokenKind::Else
             | TokenKind::StringEnd
             | TokenKind::StringSegment
             | TokenKind::StringEscape
             | TokenKind::InterpolationStart
             | TokenKind::InterpolationEnd => return None,
         })
+    }
+
+    fn parse_paren(&mut self) -> Syn {
+        let Some((token, TokenKind::LeftParen)) = self.tokens.next() else {
+            panic!()
+        };
+
+        let expr = self.parse_chain();
+
+        let Some((_, TokenKind::RightParen)) = self.tokens.next() else {
+            panic!();
+        };
+
+        match expr {
+            Some(expr) => self.syntax.push(SynData::Paren(expr)),
+            None => self.syntax.push(SynData::EmptyParen(token)),
+        }
+    }
+
+    fn parse_curly(&mut self) -> Syn {
+        let Some((token, TokenKind::LeftCurly)) = self.tokens.next() else {
+            panic!()
+        };
+
+        let expr = self.parse_chain();
+
+        let Some((_, TokenKind::RightCurly)) = self.tokens.next() else {
+            panic!();
+        };
+
+        match expr {
+            Some(expr) => self.syntax.push(SynData::Curly(expr)),
+            None => self.syntax.push(SynData::EmptyCurly(token)),
+        }
+    }
+
+    fn parse_let(&mut self) -> Syn {
+        let Some((_, TokenKind::Let)) = self.tokens.next() else {
+            panic!()
+        };
+
+        let pattern = self.parse_chain().unwrap();
+
+        let Some((_, TokenKind::Equal)) = self.tokens.next() else {
+            panic!();
+        };
+
+        let value = self.parse_tuple().unwrap();
+
+        self.syntax.push(SynData::Binding {
+            pattern: pattern,
+            value: value,
+        })
+    }
+
+    fn parse_if(&mut self) -> Syn {
+        let Some((_, TokenKind::If)) = self.tokens.next() else {
+            panic!()
+        };
+
+        let condition = self.parse_application().unwrap();
+
+        let Some((_, TokenKind::Then)) = self.tokens.next() else {
+            panic!()
+        };
+
+        let then = self.parse_application().unwrap();
+
+        if self
+            .tokens
+            .next_if(|(_, token)| *token == TokenKind::Else)
+            .is_none()
+        {
+            self.syntax.push(SynData::If { condition, then })
+        } else {
+            let else_ = self.parse_application().unwrap();
+
+            self.syntax.push(SynData::IfElse {
+                condition,
+                then,
+                else_,
+            })
+        }
+    }
+
+    fn parse_string(&mut self) -> Syn {
+        let Some((_, TokenKind::StringStart)) = self.tokens.next() else {
+            panic!()
+        };
+
+        let mut segments = Vec::new();
+
+        loop {
+            let (token, token_kind) = self.tokens.next().unwrap();
+            match token_kind {
+                TokenKind::StringSegment | TokenKind::StringEscape => {
+                    segments.push(StringSegment::Token(token))
+                }
+                TokenKind::InterpolationStart => {
+                    segments.push(StringSegment::Interpolation(self.parse_chain().unwrap()));
+
+                    let Some((_, TokenKind::InterpolationEnd)) = self.tokens.next() else {
+                        panic!();
+                    };
+                }
+                TokenKind::StringEnd => break self.syntax.push(SynData::String(segments)),
+                _ => panic!(),
+            }
+        }
     }
 }

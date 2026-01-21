@@ -2,29 +2,12 @@ use crate::key_vec::{Index, KeyVec, Sentinel};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
-    Ident,
-    Number,
-
-    StringStart,
-    StringEnd,
-    StringSegment,
-    StringEscape,
-    InterpolationStart,
-    InterpolationEnd,
-
-    Let,
-    Loop,
-    If,
-    Then,
-    Else,
-    False,
-    True,
-
     EqualGreater,
-    Equal,
-    Plus,
     HyphenGreater,
+    Equal,
     Hyphen,
+    Plus,
+
     Comma,
     Semicolon,
     Colon,
@@ -34,6 +17,23 @@ pub enum TokenKind {
     RightParen,
     LeftCurly,
     RightCurly,
+
+    Number,
+    Ident,
+    Let,
+    Loop,
+    If,
+    Then,
+    Else,
+    False,
+    True,
+
+    StringStart,
+    StringEnd,
+    StringSegment,
+    StringEscape,
+    InterpolationStart,
+    InterpolationEnd,
 }
 
 #[derive(Sentinel, Clone, Copy, Debug)]

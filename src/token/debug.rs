@@ -21,8 +21,31 @@ pub fn debug(source: &str, tokens: &Tokens) {
         }
 
         let text = match kind {
-            TokenKind::Ident => parse_identifer(source, tokens, token).bright_cyan(),
+            TokenKind::EqualGreater => "=>".bright_yellow(),
+            TokenKind::HyphenGreater => "->".bright_yellow(),
+            TokenKind::Equal => "=".bright_yellow(),
+            TokenKind::Hyphen => "-".bright_yellow(),
+            TokenKind::Plus => "+".bright_yellow(),
+
+            TokenKind::Comma => ",".white(),
+            TokenKind::Semicolon => ";".white(),
+            TokenKind::Colon => ":".white(),
+            TokenKind::Dot => ".".white(),
+
+            TokenKind::LeftParen => "(".bright_white(),
+            TokenKind::RightParen => ")".bright_white(),
+            TokenKind::LeftCurly => "{".bright_white(),
+            TokenKind::RightCurly => "}".bright_white(),
+
             TokenKind::Number => parse_u64(source, tokens, token).to_string().bright_purple(),
+            TokenKind::Ident => parse_identifer(source, tokens, token).bright_cyan(),
+            TokenKind::Let => "let".bright_red(),
+            TokenKind::Loop => "loop".bright_red(),
+            TokenKind::If => "if".bright_red(),
+            TokenKind::Then => "then".bright_red(),
+            TokenKind::Else => "else".bright_red(),
+            TokenKind::False => "false".bright_purple(),
+            TokenKind::True => "true".bright_purple(),
 
             TokenKind::StringStart => {
                 in_string = true;
@@ -48,27 +71,6 @@ pub fn debug(source: &str, tokens: &Tokens) {
                 in_string = true;
                 "}".bright_yellow().bold()
             }
-
-            TokenKind::Let => "let".bright_red(),
-            TokenKind::Loop => "loop".bright_red(),
-            TokenKind::If => "if".bright_red(),
-            TokenKind::Then => "then".bright_red(),
-            TokenKind::Else => "else".bright_red(),
-            TokenKind::False => "false".bright_purple(),
-            TokenKind::True => "true".bright_purple(),
-            TokenKind::EqualGreater => "=>".bright_yellow(),
-            TokenKind::Equal => "=".bright_yellow(),
-            TokenKind::Plus => "+".bright_yellow(),
-            TokenKind::HyphenGreater => "->".bright_yellow(),
-            TokenKind::Hyphen => "-".bright_yellow(),
-            TokenKind::Comma => ",".white(),
-            TokenKind::Semicolon => ";".white(),
-            TokenKind::Colon => ":".white(),
-            TokenKind::Dot => ".".white(),
-            TokenKind::LeftParen => "(".bright_white(),
-            TokenKind::RightParen => ")".bright_white(),
-            TokenKind::LeftCurly => "{".bright_white(),
-            TokenKind::RightCurly => "}".bright_white(),
         };
 
         print!("{text}");

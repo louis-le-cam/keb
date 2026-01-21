@@ -8,79 +8,35 @@ pub fn lex(source: &str) -> Tokens {
 
     let tokens = std::iter::from_fn(move || {
         loop {
-            if in_string {
-                let (start, char) = chars.next()?;
-
-                match char {
-                    '"' => {
-                        in_string = false;
-                        return Some((start, TokenKind::StringEnd));
-                    }
-                    '\\' => {
-                        match chars.next() {
-                            // TODO: advance multiple characters for certain escape sequences
-                            _ => {}
-                        };
-                        return Some((start, TokenKind::StringEscape));
-                    }
-                    '{' => {
-                        interpolations_curly_nesting.push(0);
-                        in_string = false;
-                        return Some((start, TokenKind::InterpolationStart));
-                    }
-                    _ => {
-                        while chars
-                            .next_if(|(_, ch)| !matches!(ch, '"' | '\\' | '{'))
-                            .is_some()
-                        {}
-
-                        return Some((start, TokenKind::StringSegment));
-                    }
-                }
-            }
-
-            while let Some(_) = chars.next_if(|(_, ch)| ch.is_whitespace()) {}
-
             let (start, char) = chars.next()?;
 
             let token = match char {
+                '"' if in_string => {
+                    in_string = false;
+                    TokenKind::StringEnd
+                }
+                '\\' if in_string => match chars.next().unwrap().1 {
+                    'n' | '\\' | '{' => TokenKind::StringEscape,
+                    // TODO: Support more escape sequence (unicode, hexadecimal, ...)
+                    _ => panic!(),
+                },
+                '{' if in_string => {
+                    interpolations_curly_nesting.push(0);
+                    in_string = false;
+                    TokenKind::InterpolationStart
+                }
+                _ if in_string => {
+                    while chars
+                        .next_if(|(_, ch)| !matches!(ch, '"' | '\\' | '{'))
+                        .is_some()
+                    {}
+
+                    TokenKind::StringSegment
+                }
+
                 '"' => {
                     in_string = true;
                     TokenKind::StringStart
-                }
-
-                '=' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::EqualGreater,
-                '=' => TokenKind::Equal,
-                '+' => TokenKind::Plus,
-                '-' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::HyphenGreater,
-                '-' => TokenKind::Hyphen,
-                ',' => TokenKind::Comma,
-                ';' => TokenKind::Semicolon,
-                ':' => TokenKind::Colon,
-                '.' => TokenKind::Dot,
-
-                '(' => TokenKind::LeftParen,
-                ')' => TokenKind::RightParen,
-                '{' => {
-                    if let Some(curly_count) = interpolations_curly_nesting.last_mut() {
-                        *curly_count += 1;
-                    }
-
-                    TokenKind::LeftCurly
-                }
-                '}' => {
-                    if let Some(curly_count) = interpolations_curly_nesting.last_mut() {
-                        if let Some(new_curly_count) = curly_count.checked_sub(1) {
-                            *curly_count = new_curly_count;
-                            TokenKind::RightCurly
-                        } else {
-                            interpolations_curly_nesting.pop();
-                            in_string = true;
-                            TokenKind::InterpolationEnd
-                        }
-                    } else {
-                        TokenKind::RightCurly
-                    }
                 }
 
                 // TODO: allow multi-line comments (with `/**/` ?)
@@ -112,6 +68,41 @@ pub fn lex(source: &str) -> Tokens {
                     continue;
                 }
 
+                '=' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::EqualGreater,
+                '-' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::HyphenGreater,
+                '=' => TokenKind::Equal,
+                '-' => TokenKind::Hyphen,
+                '+' => TokenKind::Plus,
+
+                ',' => TokenKind::Comma,
+                ';' => TokenKind::Semicolon,
+                ':' => TokenKind::Colon,
+                '.' => TokenKind::Dot,
+
+                '(' => TokenKind::LeftParen,
+                ')' => TokenKind::RightParen,
+                '{' => {
+                    if let Some(curly_count) = interpolations_curly_nesting.last_mut() {
+                        *curly_count += 1;
+                    }
+
+                    TokenKind::LeftCurly
+                }
+                '}' => {
+                    if let Some(curly_count) = interpolations_curly_nesting.last_mut() {
+                        if let Some(new_curly_count) = curly_count.checked_sub(1) {
+                            *curly_count = new_curly_count;
+                            TokenKind::RightCurly
+                        } else {
+                            interpolations_curly_nesting.pop();
+                            in_string = true;
+                            TokenKind::InterpolationEnd
+                        }
+                    } else {
+                        TokenKind::RightCurly
+                    }
+                }
+
                 '0'..='9' => {
                     while let Some(_) = chars.next_if(|(_, ch)| matches!(ch, '0'..='9')) {}
                     TokenKind::Number
@@ -132,7 +123,11 @@ pub fn lex(source: &str) -> Tokens {
                         _ => TokenKind::Ident,
                     }
                 }
-                _ => panic!("{char}"),
+                _ if char.is_whitespace() => {
+                    while let Some(_) = chars.next_if(|(_, ch)| ch.is_whitespace()) {}
+                    continue;
+                }
+                _ => panic!("Unexpected character: {char:?}"),
             };
 
             break Some((start, token));
