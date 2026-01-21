@@ -251,6 +251,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 self.tokens.next();
                 self.syntax.push(SynData::Number(token))
             }
+            TokenKind::StringStart => todo!(),
             TokenKind::LeftParen => {
                 self.tokens.next();
 
@@ -291,7 +292,12 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             | TokenKind::Colon
             | TokenKind::Dot
             | TokenKind::RightParen
-            | TokenKind::RightCurly => return None,
+            | TokenKind::RightCurly
+            | TokenKind::StringEnd
+            | TokenKind::StringSegment
+            | TokenKind::StringEscape
+            | TokenKind::InterpolationStart
+            | TokenKind::InterpolationEnd => return None,
         })
     }
 }

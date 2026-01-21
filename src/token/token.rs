@@ -5,6 +5,13 @@ pub enum TokenKind {
     Ident,
     Number,
 
+    StringStart,
+    StringEnd,
+    StringSegment,
+    StringEscape,
+    InterpolationStart,
+    InterpolationEnd,
+
     Let,
     Loop,
     If,

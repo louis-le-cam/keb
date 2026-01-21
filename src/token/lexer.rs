@@ -3,13 +3,52 @@ use crate::token::{TokenKind, Tokens};
 pub fn lex(source: &str) -> Tokens {
     let mut chars = source.char_indices().peekable();
 
+    let mut interpolations_curly_nesting = Vec::<u32>::new();
+    let mut in_string = false;
+
     let tokens = std::iter::from_fn(move || {
         loop {
+            if in_string {
+                let (start, char) = chars.next()?;
+
+                match char {
+                    '"' => {
+                        in_string = false;
+                        return Some((start, TokenKind::StringEnd));
+                    }
+                    '\\' => {
+                        match chars.next() {
+                            // TODO: advance multiple characters for certain escape sequences
+                            _ => {}
+                        };
+                        return Some((start, TokenKind::StringEscape));
+                    }
+                    '{' => {
+                        interpolations_curly_nesting.push(0);
+                        in_string = false;
+                        return Some((start, TokenKind::InterpolationStart));
+                    }
+                    _ => {
+                        while chars
+                            .next_if(|(_, ch)| !matches!(ch, '"' | '\\' | '{'))
+                            .is_some()
+                        {}
+
+                        return Some((start, TokenKind::StringSegment));
+                    }
+                }
+            }
+
             while let Some(_) = chars.next_if(|(_, ch)| ch.is_whitespace()) {}
 
             let (start, char) = chars.next()?;
 
             let token = match char {
+                '"' => {
+                    in_string = true;
+                    TokenKind::StringStart
+                }
+
                 '=' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::EqualGreater,
                 '=' => TokenKind::Equal,
                 '+' => TokenKind::Plus,
@@ -22,8 +61,27 @@ pub fn lex(source: &str) -> Tokens {
 
                 '(' => TokenKind::LeftParen,
                 ')' => TokenKind::RightParen,
-                '{' => TokenKind::LeftCurly,
-                '}' => TokenKind::RightCurly,
+                '{' => {
+                    if let Some(curly_count) = interpolations_curly_nesting.last_mut() {
+                        *curly_count += 1;
+                    }
+
+                    TokenKind::LeftCurly
+                }
+                '}' => {
+                    if let Some(curly_count) = interpolations_curly_nesting.last_mut() {
+                        if let Some(new_curly_count) = curly_count.checked_sub(1) {
+                            *curly_count = new_curly_count;
+                            TokenKind::RightCurly
+                        } else {
+                            interpolations_curly_nesting.pop();
+                            in_string = true;
+                            TokenKind::InterpolationEnd
+                        }
+                    } else {
+                        TokenKind::RightCurly
+                    }
+                }
 
                 // TODO: allow multi-line comments (with `/**/` ?)
                 // QUESTION: should we use `#` or `//` for single line comments
