@@ -1,3 +1,5 @@
+use std::fmt::{Debug, Display};
+
 use colored::Colorize as _;
 
 use crate::{
@@ -22,7 +24,7 @@ struct DebugSem<'a> {
     sem: Sem,
 }
 
-impl std::fmt::Debug for DebugSem<'_> {
+impl Debug for DebugSem<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let sem = |sem| DebugSem {
             semantic: self.semantic,
@@ -30,7 +32,7 @@ impl std::fmt::Debug for DebugSem<'_> {
             sem,
         };
 
-        let mut display = |name: &str, children: &[&dyn std::fmt::Debug]| {
+        let mut display = |name: &str, children: &[&dyn Debug]| {
             children
                 .iter()
                 .fold(
@@ -43,24 +45,39 @@ impl std::fmt::Debug for DebugSem<'_> {
         match self.semantic.get(self.sem) {
             Val::None => panic!(),
             Val::Value(sem_data) => match &sem_data.kind {
-                SemKind::Number(token) => display("number", &[token]),
-                SemKind::False(token) => display("false", &[token]),
-                SemKind::True(token) => display("true", &[token]),
+                SemKind::Number(_) => display("number", &[]),
+                SemKind::False(_) => display("false", &[]),
+                SemKind::True(_) => display("true", &[]),
                 SemKind::Module { bindings } => bindings
                     .iter()
                     .fold(
                         &mut f.debug_struct("module".bright_green().to_string().as_str()),
-                        |structure, (name, value)| structure.field(name, &sem(*value)),
+                        |structure, (name, value)| {
+                            structure.field(&name.bright_cyan().to_string(), &sem(*value))
+                        },
                     )
                     .finish(),
-                SemKind::Function { argument, body } => {
-                    display("function", &[argument, &sem(*body)])
-                }
-                SemKind::Binding { name, value, body } => {
-                    display("binding", &[name, &sem(*value), &sem(*body)])
-                }
-                SemKind::Reference { name } => display("reference", &[name]),
-                SemKind::Access { field, expr } => display("access", &[field, &sem(*expr)]),
+                SemKind::Function { argument, body } => display(
+                    "function",
+                    &[&DebugUsingDisplay(argument.bright_cyan()), &sem(*body)],
+                ),
+                SemKind::Binding { name, value, body } => display(
+                    "binding",
+                    &[
+                        &DebugUsingDisplay(name.bright_cyan()),
+                        &sem(*value),
+                        &sem(*body),
+                    ],
+                ),
+                SemKind::Reference { name } => f.write_str(&format!(
+                    "{}({})",
+                    "reference".bright_green(),
+                    name.bright_cyan()
+                )),
+                SemKind::Access { field, expr } => display(
+                    "access",
+                    &[&DebugUsingDisplay(field.bright_cyan()), &sem(*expr)],
+                ),
                 SemKind::Application { function, argument } => {
                     display("application", &[&sem(*function), &sem(*argument)])
                 }
@@ -75,7 +92,9 @@ impl std::fmt::Debug for DebugSem<'_> {
                     .iter()
                     .fold(
                         &mut f.debug_struct("build_struct".bright_green().to_string().as_str()),
-                        |structure, (name, value)| structure.field(name, &sem(*value)),
+                        |structure, (name, value)| {
+                            structure.field(&name.bright_cyan().to_string(), &sem(*value))
+                        },
                     )
                     .finish(),
                 SemKind::ChainOpen {
@@ -117,5 +136,13 @@ impl std::fmt::Debug for DebugSem<'_> {
                     .to_string(),
             },
         })
+    }
+}
+
+struct DebugUsingDisplay<T>(T);
+
+impl<T: Display> Debug for DebugUsingDisplay<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
