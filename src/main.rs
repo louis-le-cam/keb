@@ -4,13 +4,7 @@
 use std::process::Command;
 
 use colored::Colorize;
-
-mod c;
-mod key_vec;
-mod semantic;
-mod ssa;
-mod syntax;
-mod token;
+use keb::{c, semantic, ssa, syntax, token};
 
 fn main() {
     debug_header("SOURCE");
