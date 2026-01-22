@@ -1,7 +1,6 @@
 use std::iter::Peekable;
 
 use crate::{
-    key_vec::Val,
     syntax::{self, StringSegment, Syn, SynData, Syntax},
     token::{Token, TokenKind, Tokens},
 };
@@ -40,10 +39,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         })
         .collect();
 
-        match self.syntax.get_mut(root) {
-            Val::None => panic!(),
-            Val::Value(syn_data) => *syn_data = SynData::Root(syns),
-        }
+        *self.syntax.get_mut(root).unwrap() = SynData::Root(syns);
     }
 
     fn parse_chain(&mut self) -> Option<Syn> {

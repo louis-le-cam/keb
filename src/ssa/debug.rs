@@ -52,70 +52,67 @@ pub fn debug(types: &Types, ssa: &Ssa) {
         for inst in insts {
             print!("  {} = ", format!("%{}", inst.as_u32()).bright_green());
 
-            match ssa.insts.get(*inst) {
-                Val::None => panic!(),
-                Val::Value(inst_data) => match inst_data {
-                    InstData::Field(expr, field) => {
-                        print!("{} ", "field".bright_red().bold());
-                        debug_expr(expr);
-                        print!(", {field}");
-                    }
-                    InstData::Record(fields, _) => {
-                        print!("{} ", "record".bright_red().bold());
-                        for (i, field) in fields.iter().enumerate() {
-                            if i != 0 {
-                                print!(", ");
-                            }
-
-                            debug_expr(field);
+            match ssa.insts.get(*inst).unwrap() {
+                InstData::Field(expr, field) => {
+                    print!("{} ", "field".bright_red().bold());
+                    debug_expr(expr);
+                    print!(", {field}");
+                }
+                InstData::Record(fields, _) => {
+                    print!("{} ", "record".bright_red().bold());
+                    for (i, field) in fields.iter().enumerate() {
+                        if i != 0 {
+                            print!(", ");
                         }
+
+                        debug_expr(field);
                     }
-                    InstData::Add(lhs, rhs) => {
-                        print!("{} ", "add".bright_red().bold());
-                        debug_expr(lhs);
-                        print!(", ");
-                        debug_expr(rhs);
-                    }
-                    InstData::Call { function, argument } => {
-                        print!(
-                            "{} {}, ",
-                            "call".bright_red().bold(),
-                            format!("@{}", function.as_u32()).bright_yellow()
-                        );
-                        debug_expr(argument);
-                    }
-                    InstData::Jump { block, argument } => {
-                        print!(
-                            "{} {}",
-                            "jump".bright_red().bold(),
-                            format!("@{}", block.as_u32()).bright_yellow()
-                        );
-                        print!(", ");
-                        debug_expr(argument);
-                    }
-                    InstData::JumpCondition {
-                        condition,
-                        then,
-                        else_,
-                    } => {
-                        print!(
-                            "{} {} {} ",
-                            "jump".bright_red().bold(),
-                            format!("@{}", then.as_u32()).bright_yellow(),
-                            "if".bright_red(),
-                        );
-                        debug_expr(condition);
-                        print!(
-                            " {} {}",
-                            "else".bright_red(),
-                            format!("@{}", else_.as_u32()).bright_yellow()
-                        );
-                    }
-                    InstData::Return(value) => {
-                        print!("{} ", "return".bright_red().bold());
-                        debug_expr(value);
-                    }
-                },
+                }
+                InstData::Add(lhs, rhs) => {
+                    print!("{} ", "add".bright_red().bold());
+                    debug_expr(lhs);
+                    print!(", ");
+                    debug_expr(rhs);
+                }
+                InstData::Call { function, argument } => {
+                    print!(
+                        "{} {}, ",
+                        "call".bright_red().bold(),
+                        format!("@{}", function.as_u32()).bright_yellow()
+                    );
+                    debug_expr(argument);
+                }
+                InstData::Jump { block, argument } => {
+                    print!(
+                        "{} {}",
+                        "jump".bright_red().bold(),
+                        format!("@{}", block.as_u32()).bright_yellow()
+                    );
+                    print!(", ");
+                    debug_expr(argument);
+                }
+                InstData::JumpCondition {
+                    condition,
+                    then,
+                    else_,
+                } => {
+                    print!(
+                        "{} {} {} ",
+                        "jump".bright_red().bold(),
+                        format!("@{}", then.as_u32()).bright_yellow(),
+                        "if".bright_red(),
+                    );
+                    debug_expr(condition);
+                    print!(
+                        " {} {}",
+                        "else".bright_red(),
+                        format!("@{}", else_.as_u32()).bright_yellow()
+                    );
+                }
+                InstData::Return(value) => {
+                    print!("{} ", "return".bright_red().bold());
+                    debug_expr(value);
+                }
             }
             println!("{}", ";".white());
         }
@@ -144,7 +141,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
 }
 
 fn debug_type(types: &Types, type_: Type) {
-    match types.get(type_) {
+    match types.get_val(type_) {
         Val::None => panic!(),
         Val::Sentinel(sentinel) => print!("{}", format!("{sentinel:?}").bright_blue()),
         Val::Value(type_data) => match type_data {

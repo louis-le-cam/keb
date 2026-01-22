@@ -9,7 +9,7 @@ use crate::{
 use super::*;
 
 pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut Types) -> Ssa {
-    let Val::Value(SemData {
+    let Some(SemData {
         kind: SemKind::Module { bindings },
         ..
     }) = &semantic.get(semantic::ROOT_SEM)
@@ -52,7 +52,7 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut 
     ]);
 
     for (name, value) in bindings {
-        let Val::Value(SemData {
+        let Some(SemData {
             kind: SemKind::Function { .. },
             ty,
         }) = &semantic.get(*value)
@@ -63,7 +63,7 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut 
         let Val::Value(TypeData::Function {
             argument_type,
             return_type,
-        }) = types.get(*ty)
+        }) = types.get_val(*ty)
         else {
             panic!()
         };
@@ -75,7 +75,7 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut 
     }
 
     for (name, value) in bindings {
-        let Val::Value(SemData {
+        let Some(SemData {
             kind: SemKind::Function { argument, body },
             ..
         }) = &semantic.get(*value)
@@ -106,206 +106,200 @@ fn generate_expression(
     bindings: &HashMap<String, Expr>,
     functions: &HashMap<String, Block>,
 ) -> Expr {
-    match semantic.get(sem) {
-        Val::None => panic!(),
-        Val::Value(sem_data) => match &sem_data.kind {
-            SemKind::Number(token) => {
-                let value = token::parse_u64(source, tokens, *token) as u32;
-                Expr::Const(ssa.const_u32(value))
-            }
-            SemKind::False(_) => Expr::Const(ConstSentinel::False.to_index()),
-            SemKind::True(_) => Expr::Const(ConstSentinel::True.to_index()),
-            SemKind::Module { .. } => todo!(),
-            SemKind::Function { .. } => todo!(),
-            SemKind::Binding { name, value, body } => {
-                let value = generate_expression(
-                    ssa, block, source, tokens, semantic, types, *value, bindings, functions,
-                );
-                let mut bindings = bindings.clone();
-                bindings.insert(name.to_string(), value);
+    match &semantic.get(sem).unwrap().kind {
+        SemKind::Number(token) => {
+            let value = token::parse_u64(source, tokens, *token) as u32;
+            Expr::Const(ssa.const_u32(value))
+        }
+        SemKind::False(_) => Expr::Const(ConstSentinel::False.to_index()),
+        SemKind::True(_) => Expr::Const(ConstSentinel::True.to_index()),
+        SemKind::Module { .. } => todo!(),
+        SemKind::Function { .. } => todo!(),
+        SemKind::Binding { name, value, body } => {
+            let value = generate_expression(
+                ssa, block, source, tokens, semantic, types, *value, bindings, functions,
+            );
+            let mut bindings = bindings.clone();
+            bindings.insert(name.to_string(), value);
 
-                generate_expression(
-                    ssa, block, source, tokens, semantic, types, *body, &bindings, functions,
-                )
-            }
-            SemKind::Reference { name } => bindings[name],
-            SemKind::Access { field, expr } => {
-                let Val::Value(SemData { ty, .. }) = semantic.get(*expr) else {
-                    panic!()
-                };
+            generate_expression(
+                ssa, block, source, tokens, semantic, types, *body, &bindings, functions,
+            )
+        }
+        SemKind::Reference { name } => bindings[name],
+        SemKind::Access { field, expr } => {
+            let Some(SemData { ty, .. }) = semantic.get(*expr) else {
+                panic!()
+            };
 
-                let field_index = match types.get(*ty) {
-                    Val::Value(TypeData::Product { fields }) => {
-                        fields.iter().position(|(name, _)| field == name).unwrap()
-                    }
-                    Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
-                };
-
-                let expr = generate_expression(
-                    ssa, block, source, tokens, semantic, types, *expr, bindings, functions,
-                );
-
-                Expr::Inst(ssa.inst_field(*block, expr, field_index as u32))
-            }
-            SemKind::Application { function, argument } => {
-                let argument = generate_expression(
-                    ssa, block, source, tokens, semantic, types, *argument, bindings, functions,
-                );
-
-                let Val::Value(SemData {
-                    kind: SemKind::Reference { name },
-                    ..
-                }) = &semantic.get(*function)
-                else {
-                    panic!();
-                };
-
-                Expr::Inst(ssa.inst_call(*block, functions[name], argument))
-            }
-            SemKind::Loop(body) => {
-                let loop_block = ssa.basic_block(TypeSentinel::Unit.to_index());
-                ssa.inst_jump(
-                    *block,
-                    loop_block,
-                    Expr::Const(ConstSentinel::Unit.to_index()),
-                );
-                *block = loop_block;
-
-                generate_expression(
-                    ssa, block, source, tokens, semantic, types, *body, bindings, functions,
-                );
-
-                ssa.inst_jump(*block, *block, Expr::Const(ConstSentinel::Unit.to_index()));
-                Expr::Const(ConstSentinel::Unit.to_index())
-            }
-            SemKind::If { condition, then } => {
-                let condition = generate_expression(
-                    ssa, block, source, tokens, semantic, types, *condition, bindings, functions,
-                );
-
-                let mut then_block = ssa.basic_block(TypeSentinel::Unit.to_index());
-                let after_block = ssa.basic_block(TypeSentinel::Unit.to_index());
-
-                ssa.inst_jump_condition(*block, condition, then_block, after_block);
-
-                generate_expression(
-                    ssa,
-                    &mut then_block,
-                    source,
-                    tokens,
-                    semantic,
-                    types,
-                    *then,
-                    bindings,
-                    functions,
-                );
-
-                ssa.inst_jump(
-                    then_block,
-                    after_block,
-                    Expr::Const(ConstSentinel::Unit.to_index()),
-                );
-
-                *block = after_block;
-
-                Expr::Const(ConstSentinel::Unit.to_index())
-            }
-            SemKind::IfElse {
-                condition,
-                then,
-                else_,
-            } => {
-                let condition = generate_expression(
-                    ssa, block, source, tokens, semantic, types, *condition, bindings, functions,
-                );
-
-                let mut then_block = ssa.basic_block(TypeSentinel::Unit.to_index());
-                let mut else_block = ssa.basic_block(TypeSentinel::Unit.to_index());
-
-                ssa.inst_jump_condition(*block, condition, then_block, else_block);
-
-                let then_expr = generate_expression(
-                    ssa,
-                    &mut then_block,
-                    source,
-                    tokens,
-                    semantic,
-                    types,
-                    *then,
-                    bindings,
-                    functions,
-                );
-
-                let else_expr = generate_expression(
-                    ssa,
-                    &mut else_block,
-                    source,
-                    tokens,
-                    semantic,
-                    types,
-                    *else_,
-                    bindings,
-                    functions,
-                );
-
-                let Val::Value(SemData { ty: type_, kind: _ }) = semantic.get(*then) else {
-                    panic!()
-                };
-
-                let after_block = ssa.basic_block(*type_);
-                ssa.inst_jump(then_block, after_block, then_expr);
-                ssa.inst_jump(else_block, after_block, else_expr);
-
-                *block = after_block;
-
-                Expr::BlockArg(after_block)
-            }
-            SemKind::BuildStruct { fields } => {
-                let fields = fields
-                    .iter()
-                    .map(|(_, value)| {
-                        generate_expression(
-                            ssa, block, source, tokens, semantic, types, *value, bindings,
-                            functions,
-                        )
-                    })
-                    .collect();
-
-                Expr::Inst(ssa.inst_product(types, *block, fields))
-            }
-            SemKind::ChainOpen {
-                statements,
-                expression,
-            } => {
-                for statement in statements {
-                    generate_expression(
-                        ssa, block, source, tokens, semantic, types, *statement, bindings,
-                        functions,
-                    );
+            let field_index = match types.get_val(*ty) {
+                Val::Value(TypeData::Product { fields }) => {
+                    fields.iter().position(|(name, _)| field == name).unwrap()
                 }
+                Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
+            };
 
-                generate_expression(
-                    ssa,
-                    block,
-                    source,
-                    tokens,
-                    semantic,
-                    types,
-                    *expression,
-                    bindings,
-                    functions,
-                )
-            }
-            SemKind::ChainClosed { statements } => {
-                for statement in statements {
+            let expr = generate_expression(
+                ssa, block, source, tokens, semantic, types, *expr, bindings, functions,
+            );
+
+            Expr::Inst(ssa.inst_field(*block, expr, field_index as u32))
+        }
+        SemKind::Application { function, argument } => {
+            let argument = generate_expression(
+                ssa, block, source, tokens, semantic, types, *argument, bindings, functions,
+            );
+
+            let Some(SemData {
+                kind: SemKind::Reference { name },
+                ..
+            }) = &semantic.get(*function)
+            else {
+                panic!();
+            };
+
+            Expr::Inst(ssa.inst_call(*block, functions[name], argument))
+        }
+        SemKind::Loop(body) => {
+            let loop_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+            ssa.inst_jump(
+                *block,
+                loop_block,
+                Expr::Const(ConstSentinel::Unit.to_index()),
+            );
+            *block = loop_block;
+
+            generate_expression(
+                ssa, block, source, tokens, semantic, types, *body, bindings, functions,
+            );
+
+            ssa.inst_jump(*block, *block, Expr::Const(ConstSentinel::Unit.to_index()));
+            Expr::Const(ConstSentinel::Unit.to_index())
+        }
+        SemKind::If { condition, then } => {
+            let condition = generate_expression(
+                ssa, block, source, tokens, semantic, types, *condition, bindings, functions,
+            );
+
+            let mut then_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+            let after_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+
+            ssa.inst_jump_condition(*block, condition, then_block, after_block);
+
+            generate_expression(
+                ssa,
+                &mut then_block,
+                source,
+                tokens,
+                semantic,
+                types,
+                *then,
+                bindings,
+                functions,
+            );
+
+            ssa.inst_jump(
+                then_block,
+                after_block,
+                Expr::Const(ConstSentinel::Unit.to_index()),
+            );
+
+            *block = after_block;
+
+            Expr::Const(ConstSentinel::Unit.to_index())
+        }
+        SemKind::IfElse {
+            condition,
+            then,
+            else_,
+        } => {
+            let condition = generate_expression(
+                ssa, block, source, tokens, semantic, types, *condition, bindings, functions,
+            );
+
+            let mut then_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+            let mut else_block = ssa.basic_block(TypeSentinel::Unit.to_index());
+
+            ssa.inst_jump_condition(*block, condition, then_block, else_block);
+
+            let then_expr = generate_expression(
+                ssa,
+                &mut then_block,
+                source,
+                tokens,
+                semantic,
+                types,
+                *then,
+                bindings,
+                functions,
+            );
+
+            let else_expr = generate_expression(
+                ssa,
+                &mut else_block,
+                source,
+                tokens,
+                semantic,
+                types,
+                *else_,
+                bindings,
+                functions,
+            );
+
+            let Some(SemData { ty: type_, kind: _ }) = semantic.get(*then) else {
+                panic!()
+            };
+
+            let after_block = ssa.basic_block(*type_);
+            ssa.inst_jump(then_block, after_block, then_expr);
+            ssa.inst_jump(else_block, after_block, else_expr);
+
+            *block = after_block;
+
+            Expr::BlockArg(after_block)
+        }
+        SemKind::BuildStruct { fields } => {
+            let fields = fields
+                .iter()
+                .map(|(_, value)| {
                     generate_expression(
-                        ssa, block, source, tokens, semantic, types, *statement, bindings,
-                        functions,
-                    );
-                }
+                        ssa, block, source, tokens, semantic, types, *value, bindings, functions,
+                    )
+                })
+                .collect();
 
-                Expr::Const(ConstSentinel::Unit.to_index())
+            Expr::Inst(ssa.inst_product(types, *block, fields))
+        }
+        SemKind::ChainOpen {
+            statements,
+            expression,
+        } => {
+            for statement in statements {
+                generate_expression(
+                    ssa, block, source, tokens, semantic, types, *statement, bindings, functions,
+                );
             }
-        },
+
+            generate_expression(
+                ssa,
+                block,
+                source,
+                tokens,
+                semantic,
+                types,
+                *expression,
+                bindings,
+                functions,
+            )
+        }
+        SemKind::ChainClosed { statements } => {
+            for statement in statements {
+                generate_expression(
+                    ssa, block, source, tokens, semantic, types, *statement, bindings, functions,
+                );
+            }
+
+            Expr::Const(ConstSentinel::Unit.to_index())
+        }
     }
 }

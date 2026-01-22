@@ -15,51 +15,42 @@ impl Ssa {
         match expr {
             Expr::Const(const_) => self.const_type(const_),
             Expr::Inst(inst) => self.instruction_type(types, inst),
-            Expr::BlockArg(block) => match self.blocks.get(block) {
-                Val::None => panic!(),
-                Val::Value(
-                    BlockData::ExternFunction { arg, .. }
-                    | BlockData::Function { arg, .. }
-                    | BlockData::Block { arg, .. },
-                ) => *arg,
+            Expr::BlockArg(block) => match self.blocks.get(block).unwrap() {
+                BlockData::ExternFunction { arg, .. }
+                | BlockData::Function { arg, .. }
+                | BlockData::Block { arg, .. } => *arg,
             },
         }
     }
 
     pub fn instruction_type(&self, types: &Types, inst: Inst) -> Type {
-        match self.insts.get(inst) {
-            Val::None => panic!(),
-            Val::Value(inst_data) => match inst_data {
-                InstData::Field(expr, field) => {
-                    let field = *field;
+        match self.insts.get(inst).unwrap() {
+            InstData::Field(expr, field) => {
+                let field = *field;
 
-                    let record_type = self.expression_type(types, *expr);
+                let record_type = self.expression_type(types, *expr);
 
-                    match types.get(record_type) {
-                        Val::Value(TypeData::Product { fields }) => fields[field as usize].1,
-                        Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
-                    }
+                match types.get_val(record_type) {
+                    Val::Value(TypeData::Product { fields }) => fields[field as usize].1,
+                    Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
                 }
-                InstData::Record(_, ty) => *ty,
-                InstData::Add(lhs, _) => self.expression_type(types, *lhs),
-                InstData::Call {
-                    function: block, ..
-                } => match self.blocks.get(*block) {
-                    Val::None => panic!(),
-                    Val::Value(
-                        BlockData::ExternFunction { ret, .. } | BlockData::Function { ret, .. },
-                    ) => *ret,
-                    Val::Value(BlockData::Block { .. }) => TypeSentinel::Unit.to_index(),
-                },
-                InstData::Jump { .. } | InstData::JumpCondition { .. } | InstData::Return(_) => {
-                    TypeSentinel::Unit.to_index()
-                }
+            }
+            InstData::Record(_, ty) => *ty,
+            InstData::Add(lhs, _) => self.expression_type(types, *lhs),
+            InstData::Call {
+                function: block, ..
+            } => match self.blocks.get(*block).unwrap() {
+                BlockData::ExternFunction { ret, .. } | BlockData::Function { ret, .. } => *ret,
+                BlockData::Block { .. } => TypeSentinel::Unit.to_index(),
             },
+            InstData::Jump { .. } | InstData::JumpCondition { .. } | InstData::Return(_) => {
+                TypeSentinel::Unit.to_index()
+            }
         }
     }
 
     pub fn const_type(&self, const_: Const) -> Type {
-        match self.consts.get(const_) {
+        match self.consts.get_val(const_) {
             Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 ConstSentinel::Unit => TypeSentinel::Unit.to_index(),
@@ -126,14 +117,11 @@ impl Ssa {
     fn inst(&mut self, block: Block, inst_data: InstData) -> Inst {
         let inst = self.insts.push(inst_data);
 
-        match self.blocks.get_mut(block) {
-            Val::None => panic!(),
-            Val::Value(BlockData::ExternFunction { .. }) => {
+        match self.blocks.get_mut(block).unwrap() {
+            BlockData::ExternFunction { .. } => {
                 panic!("Cannot add instruction to extern function")
             }
-            Val::Value(BlockData::Function { insts, .. } | BlockData::Block { insts, .. }) => {
-                insts.push(inst)
-            }
+            BlockData::Function { insts, .. } | BlockData::Block { insts, .. } => insts.push(inst),
         }
 
         inst

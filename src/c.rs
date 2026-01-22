@@ -68,8 +68,7 @@ impl Generator<'_> {
     }
 
     fn generate_extern_function(&mut self, function: Block) -> String {
-        let Val::Value(BlockData::ExternFunction { name, arg, ret }) =
-            &self.ssa.blocks.get(function)
+        let Some(BlockData::ExternFunction { name, arg, ret }) = &self.ssa.blocks.get(function)
         else {
             panic!()
         };
@@ -99,7 +98,7 @@ impl Generator<'_> {
     }
 
     fn generate_function(&mut self, function: Block) -> String {
-        let Val::Value(BlockData::Function {
+        let Some(BlockData::Function {
             name,
             arg,
             ret,
@@ -129,7 +128,7 @@ impl Generator<'_> {
         let blocks = self.function_blocks(function);
 
         for block in &blocks {
-            let Val::Value(BlockData::Block { arg, insts: _ }) = self.ssa.blocks.get(*block) else {
+            let Some(BlockData::Block { arg, insts: _ }) = self.ssa.blocks.get(*block) else {
                 panic!()
             };
 
@@ -148,7 +147,7 @@ impl Generator<'_> {
         body.push_str(&self.generate_statements(insts.iter().copied()));
 
         for block in &blocks {
-            let Val::Value(BlockData::Block { insts, .. }) = self.ssa.blocks.get(*block) else {
+            let Some(BlockData::Block { insts, .. }) = self.ssa.blocks.get(*block) else {
                 panic!()
             };
 
@@ -160,7 +159,7 @@ impl Generator<'_> {
     }
 
     fn function_blocks(&mut self, function: Block) -> HashSet<Block> {
-        let Val::Value(BlockData::Function { insts, .. }) = &self.ssa.blocks.get(function) else {
+        let Some(BlockData::Function { insts, .. }) = &self.ssa.blocks.get(function) else {
             panic!()
         };
 
@@ -168,10 +167,10 @@ impl Generator<'_> {
 
         for inst in insts {
             match self.ssa.insts.get(*inst) {
-                Val::Value(InstData::Jump { block, .. }) => {
+                Some(InstData::Jump { block, .. }) => {
                     blocks.insert(*block);
                 }
-                Val::Value(InstData::JumpCondition { then, else_, .. }) => {
+                Some(InstData::JumpCondition { then, else_, .. }) => {
                     blocks.insert(*then);
                     blocks.insert(*else_);
                 }
@@ -184,16 +183,16 @@ impl Generator<'_> {
         while let Some(&block) = blocks.difference(&checked_blocks).next() {
             checked_blocks.insert(block);
 
-            let Val::Value(BlockData::Block { insts, .. }) = self.ssa.blocks.get(block) else {
+            let Some(BlockData::Block { insts, .. }) = self.ssa.blocks.get(block) else {
                 panic!();
             };
 
             for inst in insts {
                 match self.ssa.insts.get(*inst) {
-                    Val::Value(InstData::Jump { block, .. }) => {
+                    Some(InstData::Jump { block, .. }) => {
                         blocks.insert(*block);
                     }
-                    Val::Value(InstData::JumpCondition { then, else_, .. }) => {
+                    Some(InstData::JumpCondition { then, else_, .. }) => {
                         blocks.insert(*then);
                         blocks.insert(*else_);
                     }
@@ -217,74 +216,69 @@ impl Generator<'_> {
                 body.push_str(&format!("{c_type} i{} = ", inst.as_u32()));
             }
 
-            match self.ssa.insts.get(inst) {
-                Val::None => panic!(),
-                Val::Value(inst_data) => match inst_data {
-                    InstData::Field(expr, field) => {
-                        body.push_str(&format!("{}.f{field}", self.generate_expr(*expr)))
-                    }
-                    InstData::Record(fields, _) => body.push_str(&format!(
-                        "{{ {} }}",
-                        fields
-                            .iter()
-                            .map(|field| format!("{}, ", self.generate_expr(*field)))
-                            .collect::<String>()
-                    )),
-                    InstData::Add(lhs, rhs) => body.push_str(&format!(
-                        "{} + {}",
-                        self.generate_expr(*lhs),
-                        self.generate_expr(*rhs),
-                    )),
-                    InstData::Call { function, argument } => match self.ssa.blocks.get(*function) {
-                        Val::None => panic!(),
-                        Val::Value(
-                            BlockData::ExternFunction { name, .. }
-                            | BlockData::Function { name, .. },
-                        ) => {
-                            let argument_text = match argument {
-                                Expr::Const(const_)
-                                    if const_.sentinel() == Some(ConstSentinel::Unit) =>
-                                {
-                                    ""
-                                }
-                                _ => &self.generate_expr(*argument),
-                            };
+            match self.ssa.insts.get(inst).unwrap() {
+                InstData::Field(expr, field) => {
+                    body.push_str(&format!("{}.f{field}", self.generate_expr(*expr)))
+                }
+                InstData::Record(fields, _) => body.push_str(&format!(
+                    "{{ {} }}",
+                    fields
+                        .iter()
+                        .map(|field| format!("{}, ", self.generate_expr(*field)))
+                        .collect::<String>()
+                )),
+                InstData::Add(lhs, rhs) => body.push_str(&format!(
+                    "{} + {}",
+                    self.generate_expr(*lhs),
+                    self.generate_expr(*rhs),
+                )),
+                InstData::Call { function, argument } => match self
+                    .ssa
+                    .blocks
+                    .get(*function)
+                    .unwrap()
+                {
+                    BlockData::ExternFunction { name, .. } | BlockData::Function { name, .. } => {
+                        let argument_text = match argument {
+                            Expr::Const(const_)
+                                if const_.sentinel() == Some(ConstSentinel::Unit) =>
+                            {
+                                ""
+                            }
+                            _ => &self.generate_expr(*argument),
+                        };
 
-                            body.push_str(&format!(
-                                "f{}_{name}({argument_text})",
-                                function.as_u32(),
-                            ));
-                        }
-                        Val::Value(BlockData::Block { .. }) => panic!(),
-                    },
-                    InstData::Jump { block, argument } => {
-                        body.push_str(&format!(
-                            "a{} = {};\n    goto b{}",
-                            block.as_u32(),
-                            self.generate_expr(*argument),
-                            block.as_u32(),
-                        ));
+                        body.push_str(&format!("f{}_{name}({argument_text})", function.as_u32(),));
                     }
-                    InstData::JumpCondition {
-                        condition,
-                        then,
-                        else_,
-                    } => body.push_str(&format!(
-                        "if ({}) {{ goto b{}; }} else {{ goto b{}; }}",
-                        self.generate_expr(*condition),
-                        then.as_u32(),
-                        else_.as_u32(),
-                    )),
-                    InstData::Return(expr) => {
-                        if let Some(TypeSentinel::Unit) =
-                            self.ssa.expression_type(self.types, *expr).sentinel()
-                        {
-                            body.push_str("return");
-                        } else {
-                            body.push_str(&format!("return {}", self.generate_expr(*expr)))
-                        }
-                    }
+                    BlockData::Block { .. } => panic!(),
                 },
+                InstData::Jump { block, argument } => {
+                    body.push_str(&format!(
+                        "a{} = {};\n    goto b{}",
+                        block.as_u32(),
+                        self.generate_expr(*argument),
+                        block.as_u32(),
+                    ));
+                }
+                InstData::JumpCondition {
+                    condition,
+                    then,
+                    else_,
+                } => body.push_str(&format!(
+                    "if ({}) {{ goto b{}; }} else {{ goto b{}; }}",
+                    self.generate_expr(*condition),
+                    then.as_u32(),
+                    else_.as_u32(),
+                )),
+                InstData::Return(expr) => {
+                    if let Some(TypeSentinel::Unit) =
+                        self.ssa.expression_type(self.types, *expr).sentinel()
+                    {
+                        body.push_str("return");
+                    } else {
+                        body.push_str(&format!("return {}", self.generate_expr(*expr)))
+                    }
+                }
             }
 
             body.push_str(";\n");
@@ -294,7 +288,7 @@ impl Generator<'_> {
     }
 
     fn generate_type(&mut self, type_: Type) -> String {
-        let c_type = match self.types.get(type_) {
+        let c_type = match self.types.get_val(type_) {
             Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
@@ -336,7 +330,7 @@ impl Generator<'_> {
 
     fn generate_expr(&mut self, expr: Expr) -> String {
         match expr {
-            Expr::Const(const_) => match self.ssa.consts.get(const_) {
+            Expr::Const(const_) => match self.ssa.consts.get_val(const_) {
                 Val::None => panic!(),
                 Val::Sentinel(sentinel) => match sentinel {
                     ConstSentinel::Unit => panic!(),
