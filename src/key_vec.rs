@@ -117,6 +117,20 @@ impl<S: NonEmptySentinel, V> KeyVec<S, V> {
     }
 }
 
+impl<S: EmptySentinel, V> core::ops::Index<Index<S>> for KeyVec<S, V> {
+    type Output = V;
+
+    fn index(&self, index: Index<S>) -> &Self::Output {
+        &self.0[index.index as usize]
+    }
+}
+
+impl<S: EmptySentinel, V> core::ops::IndexMut<Index<S>> for KeyVec<S, V> {
+    fn index_mut(&mut self, index: Index<S>) -> &mut Self::Output {
+        &mut self.0[index.index as usize]
+    }
+}
+
 impl<S: Sentinel, V> Default for KeyVec<S, V> {
     fn default() -> Self {
         Self(Vec::new(), PhantomData)
