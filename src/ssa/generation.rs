@@ -9,10 +9,10 @@ use crate::{
 use super::*;
 
 pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut Types) -> Ssa {
-    let Some(SemData {
+    let SemData {
         kind: SemKind::Module { bindings },
         ..
-    }) = &semantic.get(semantic::ROOT_SEM)
+    } = &semantic[semantic::ROOT_SEM]
     else {
         panic!();
     };
@@ -52,10 +52,10 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut 
     ]);
 
     for (name, value) in bindings {
-        let Some(SemData {
+        let SemData {
             kind: SemKind::Function { .. },
             ty,
-        }) = &semantic.get(*value)
+        } = &semantic[*value]
         else {
             panic!();
         };
@@ -75,10 +75,10 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut 
     }
 
     for (name, value) in bindings {
-        let Some(SemData {
+        let SemData {
             kind: SemKind::Function { argument, body },
             ..
-        }) = &semantic.get(*value)
+        } = &semantic[*value]
         else {
             panic!();
         };
@@ -106,7 +106,7 @@ fn generate_expression(
     bindings: &HashMap<String, Expr>,
     functions: &HashMap<String, Block>,
 ) -> Expr {
-    match &semantic.get(sem).unwrap().kind {
+    match &semantic[sem].kind {
         SemKind::Number(token) => {
             let value = token::parse_u64(source, tokens, *token) as u32;
             Expr::Const(ssa.const_u32(value))
@@ -128,11 +128,7 @@ fn generate_expression(
         }
         SemKind::Reference { name } => bindings[name],
         SemKind::Access { field, expr } => {
-            let Some(SemData { ty, .. }) = semantic.get(*expr) else {
-                panic!()
-            };
-
-            let field_index = match types.get_val(*ty) {
+            let field_index = match types.get_val(semantic[*expr].ty) {
                 Val::Value(TypeData::Product { fields }) => {
                     fields.iter().position(|(name, _)| field == name).unwrap()
                 }
@@ -150,10 +146,10 @@ fn generate_expression(
                 ssa, block, source, tokens, semantic, types, *argument, bindings, functions,
             );
 
-            let Some(SemData {
+            let SemData {
                 kind: SemKind::Reference { name },
                 ..
-            }) = &semantic.get(*function)
+            } = &semantic[*function]
             else {
                 panic!();
             };
@@ -246,11 +242,7 @@ fn generate_expression(
                 functions,
             );
 
-            let Some(SemData { ty: type_, kind: _ }) = semantic.get(*then) else {
-                panic!()
-            };
-
-            let after_block = ssa.basic_block(*type_);
+            let after_block = ssa.basic_block(semantic[*then].ty);
             ssa.inst_jump(then_block, after_block, then_expr);
             ssa.inst_jump(else_block, after_block, else_expr);
 

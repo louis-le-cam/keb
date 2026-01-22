@@ -39,7 +39,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         })
         .collect();
 
-        *self.syntax.get_mut(root).unwrap() = SynData::Root(syns);
+        self.syntax[root] = SynData::Root(syns);
     }
 
     fn parse_chain(&mut self) -> Option<Syn> {

@@ -68,8 +68,7 @@ impl Generator<'_> {
     }
 
     fn generate_extern_function(&mut self, function: Block) -> String {
-        let Some(BlockData::ExternFunction { name, arg, ret }) = &self.ssa.blocks.get(function)
-        else {
+        let BlockData::ExternFunction { name, arg, ret } = &self.ssa.blocks[function] else {
             panic!()
         };
 
@@ -98,12 +97,12 @@ impl Generator<'_> {
     }
 
     fn generate_function(&mut self, function: Block) -> String {
-        let Some(BlockData::Function {
+        let BlockData::Function {
             name,
             arg,
             ret,
             insts,
-        }) = &self.ssa.blocks.get(function)
+        } = &self.ssa.blocks[function]
         else {
             panic!()
         };
@@ -128,7 +127,7 @@ impl Generator<'_> {
         let blocks = self.function_blocks(function);
 
         for block in &blocks {
-            let Some(BlockData::Block { arg, insts: _ }) = self.ssa.blocks.get(*block) else {
+            let BlockData::Block { arg, insts: _ } = &self.ssa.blocks[*block] else {
                 panic!()
             };
 
@@ -147,7 +146,7 @@ impl Generator<'_> {
         body.push_str(&self.generate_statements(insts.iter().copied()));
 
         for block in &blocks {
-            let Some(BlockData::Block { insts, .. }) = self.ssa.blocks.get(*block) else {
+            let BlockData::Block { insts, .. } = &self.ssa.blocks[*block] else {
                 panic!()
             };
 
@@ -159,18 +158,18 @@ impl Generator<'_> {
     }
 
     fn function_blocks(&mut self, function: Block) -> HashSet<Block> {
-        let Some(BlockData::Function { insts, .. }) = &self.ssa.blocks.get(function) else {
+        let BlockData::Function { insts, .. } = &self.ssa.blocks[function] else {
             panic!()
         };
 
         let mut blocks = HashSet::new();
 
         for inst in insts {
-            match self.ssa.insts.get(*inst) {
-                Some(InstData::Jump { block, .. }) => {
+            match &self.ssa.insts[*inst] {
+                InstData::Jump { block, .. } => {
                     blocks.insert(*block);
                 }
-                Some(InstData::JumpCondition { then, else_, .. }) => {
+                InstData::JumpCondition { then, else_, .. } => {
                     blocks.insert(*then);
                     blocks.insert(*else_);
                 }
@@ -183,16 +182,16 @@ impl Generator<'_> {
         while let Some(&block) = blocks.difference(&checked_blocks).next() {
             checked_blocks.insert(block);
 
-            let Some(BlockData::Block { insts, .. }) = self.ssa.blocks.get(block) else {
+            let BlockData::Block { insts, .. } = &self.ssa.blocks[block] else {
                 panic!();
             };
 
             for inst in insts {
-                match self.ssa.insts.get(*inst) {
-                    Some(InstData::Jump { block, .. }) => {
+                match &self.ssa.insts[*inst] {
+                    InstData::Jump { block, .. } => {
                         blocks.insert(*block);
                     }
-                    Some(InstData::JumpCondition { then, else_, .. }) => {
+                    InstData::JumpCondition { then, else_, .. } => {
                         blocks.insert(*then);
                         blocks.insert(*else_);
                     }
@@ -216,7 +215,7 @@ impl Generator<'_> {
                 body.push_str(&format!("{c_type} i{} = ", inst.as_u32()));
             }
 
-            match self.ssa.insts.get(inst).unwrap() {
+            match &self.ssa.insts[inst] {
                 InstData::Field(expr, field) => {
                     body.push_str(&format!("{}.f{field}", self.generate_expr(*expr)))
                 }
@@ -232,12 +231,7 @@ impl Generator<'_> {
                     self.generate_expr(*lhs),
                     self.generate_expr(*rhs),
                 )),
-                InstData::Call { function, argument } => match self
-                    .ssa
-                    .blocks
-                    .get(*function)
-                    .unwrap()
-                {
+                InstData::Call { function, argument } => match &self.ssa.blocks[*function] {
                     BlockData::ExternFunction { name, .. } | BlockData::Function { name, .. } => {
                         let argument_text = match argument {
                             Expr::Const(const_)

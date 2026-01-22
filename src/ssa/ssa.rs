@@ -15,7 +15,7 @@ impl Ssa {
         match expr {
             Expr::Const(const_) => self.const_type(const_),
             Expr::Inst(inst) => self.instruction_type(types, inst),
-            Expr::BlockArg(block) => match self.blocks.get(block).unwrap() {
+            Expr::BlockArg(block) => match &self.blocks[block] {
                 BlockData::ExternFunction { arg, .. }
                 | BlockData::Function { arg, .. }
                 | BlockData::Block { arg, .. } => *arg,
@@ -24,7 +24,7 @@ impl Ssa {
     }
 
     pub fn instruction_type(&self, types: &Types, inst: Inst) -> Type {
-        match self.insts.get(inst).unwrap() {
+        match &self.insts[inst] {
             InstData::Field(expr, field) => {
                 let field = *field;
 
@@ -39,7 +39,7 @@ impl Ssa {
             InstData::Add(lhs, _) => self.expression_type(types, *lhs),
             InstData::Call {
                 function: block, ..
-            } => match self.blocks.get(*block).unwrap() {
+            } => match &self.blocks[*block] {
                 BlockData::ExternFunction { ret, .. } | BlockData::Function { ret, .. } => *ret,
                 BlockData::Block { .. } => TypeSentinel::Unit.to_index(),
             },
@@ -117,7 +117,7 @@ impl Ssa {
     fn inst(&mut self, block: Block, inst_data: InstData) -> Inst {
         let inst = self.insts.push(inst_data);
 
-        match self.blocks.get_mut(block).unwrap() {
+        match &mut self.blocks[block] {
             BlockData::ExternFunction { .. } => {
                 panic!("Cannot add instruction to extern function")
             }

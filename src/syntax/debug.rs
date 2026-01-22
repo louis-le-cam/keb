@@ -19,7 +19,7 @@ pub fn debug(syntax: &Syntax) {
                 })
             };
 
-            match self.syntax.get(self.syn).unwrap() {
+            match &self.syntax[self.syn] {
                 SynData::Root(syns) => syns
                     .iter()
                     .fold(

@@ -85,16 +85,6 @@ impl<S: Sentinel, V> KeyVec<S, V> {
     }
 }
 
-impl<S: EmptySentinel, V> KeyVec<S, V> {
-    pub fn get(&self, index: Index<S>) -> Option<&V> {
-        self.0.get(index.index as usize)
-    }
-
-    pub fn get_mut(&mut self, index: Index<S>) -> Option<&mut V> {
-        self.0.get_mut(index.index as usize)
-    }
-}
-
 impl<S: NonEmptySentinel, V> KeyVec<S, V> {
     pub fn get_val(&self, index: Index<S>) -> Val<S, &V> {
         match S::from_index(index) {

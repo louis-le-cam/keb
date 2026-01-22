@@ -1,7 +1,7 @@
 use crate::token::{Token, TokenKind, Tokens};
 
 pub fn parse_identifer<'a>(source: &'a str, tokens: &Tokens, token: Token) -> &'a str {
-    let (offset, kind) = *tokens.get(token).unwrap();
+    let (offset, kind) = tokens[token];
 
     let source_from_token = &source[offset..];
 
@@ -22,7 +22,7 @@ pub fn parse_identifer<'a>(source: &'a str, tokens: &Tokens, token: Token) -> &'
 }
 
 pub fn parse_u64(source: &str, tokens: &Tokens, token: Token) -> u64 {
-    let (offset, kind) = *tokens.get(token).unwrap();
+    let (offset, kind) = tokens[token];
 
     let source_from_token = &source[offset..];
 
@@ -45,7 +45,7 @@ pub fn parse_u64(source: &str, tokens: &Tokens, token: Token) -> u64 {
 }
 
 pub fn parse_string_segment<'a>(source: &'a str, tokens: &Tokens, token: Token) -> &'a str {
-    let (offset, kind) = *tokens.get(token).unwrap();
+    let (offset, kind) = tokens[token];
 
     let source_from_token = &source[offset..];
 
@@ -60,7 +60,7 @@ pub fn parse_string_segment<'a>(source: &'a str, tokens: &Tokens, token: Token) 
 }
 
 pub fn parse_string_escape(source: &str, tokens: &Tokens, token: Token) -> char {
-    let (offset, kind) = *tokens.get(token).unwrap();
+    let (offset, kind) = tokens[token];
 
     let source_from_token = &source[offset..];
 

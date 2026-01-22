@@ -52,7 +52,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
         for inst in insts {
             print!("  {} = ", format!("%{}", inst.as_u32()).bright_green());
 
-            match ssa.insts.get(*inst).unwrap() {
+            match &ssa.insts[*inst] {
                 InstData::Field(expr, field) => {
                     print!("{} ", "field".bright_red().bold());
                     debug_expr(expr);

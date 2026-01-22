@@ -52,13 +52,11 @@ impl Inferrer<'_> {
     }
 
     fn add_type(&mut self, sem: Sem, type_: Type) {
-        let sem_data = self.semantic.get_mut(sem).unwrap();
-        sem_data.ty = combine_types(self.types, sem_data.ty, type_);
+        self.semantic[sem].ty = combine_types(self.types, self.semantic[sem].ty, type_);
     }
 
     fn infer_expression(&mut self, scope: &Scope, i: Sem) {
-        let sem_data = self.semantic.get_mut(i).unwrap();
-        match &sem_data.kind {
+        match &self.semantic[i].kind {
             SemKind::Number { .. } => self.add_type(i, TypeSentinel::Uint32.to_index()),
             SemKind::False { .. } => self.add_type(i, TypeSentinel::False.to_index()),
             SemKind::True { .. } => self.add_type(i, TypeSentinel::True.to_index()),
@@ -76,7 +74,7 @@ impl Inferrer<'_> {
 
                 let fields = bindings
                     .iter()
-                    .map(|(name, value)| (name.clone(), { self.semantic.get(*value).unwrap().ty }))
+                    .map(|(name, value)| (name.clone(), { self.semantic[*value].ty }))
                     .collect::<Vec<(String, Type)>>();
 
                 let type_ = self.types.push(TypeData::Product { fields });
@@ -89,20 +87,20 @@ impl Inferrer<'_> {
                 scope.insert(argument.clone(), ScopeItem::Argument(i));
 
                 {
-                    let (argument_type, return_type) =
-                        match self.types.get_val(self.semantic.get(i).unwrap().ty) {
-                            Val::None => panic!(),
-                            Val::Sentinel(_) => panic!(),
-                            Val::Value(type_data) => match type_data {
-                                TypeData::Function {
-                                    argument_type,
-                                    return_type,
-                                } => (*argument_type, *return_type),
-                                _ => panic!(),
-                            },
-                        };
+                    let (argument_type, return_type) = match self.types.get_val(self.semantic[i].ty)
+                    {
+                        Val::None => panic!(),
+                        Val::Sentinel(_) => panic!(),
+                        Val::Value(type_data) => match type_data {
+                            TypeData::Function {
+                                argument_type,
+                                return_type,
+                            } => (*argument_type, *return_type),
+                            _ => panic!(),
+                        },
+                    };
 
-                    let body_type = self.semantic.get(body).unwrap().ty;
+                    let body_type = self.semantic[body].ty;
 
                     let return_type = combine_types(&mut self.types, body_type, return_type);
 
@@ -116,7 +114,7 @@ impl Inferrer<'_> {
                 self.infer_expression(&scope, body);
 
                 {
-                    let sem_type = self.semantic.get(i).unwrap().ty;
+                    let sem_type = self.semantic[i].ty;
 
                     let (argument_type, return_type) = match &self.types.get_val(sem_type) {
                         Val::Value(TypeData::Function {
@@ -129,7 +127,7 @@ impl Inferrer<'_> {
                         ),
                     };
 
-                    let body_type = self.semantic.get(body).unwrap().ty;
+                    let body_type = self.semantic[body].ty;
 
                     let return_type = combine_types(self.types, body_type, return_type);
 
@@ -152,19 +150,17 @@ impl Inferrer<'_> {
 
                 self.infer_expression(&scope, body);
 
-                let body_type = self.semantic.get(body).unwrap().ty;
+                let body_type = self.semantic[body].ty;
 
                 self.add_type(i, body_type);
             }
             SemKind::Reference { name } => {
                 let type_ = match scope[name] {
-                    ScopeItem::Sem(sem) => self.semantic.get(sem).unwrap().ty,
-                    ScopeItem::Argument(sem) => {
-                        match self.types.get_val(self.semantic.get(sem).unwrap().ty) {
-                            Val::Value(TypeData::Function { argument_type, .. }) => *argument_type,
-                            Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
-                        }
-                    }
+                    ScopeItem::Sem(sem) => self.semantic[sem].ty,
+                    ScopeItem::Argument(sem) => match self.types.get_val(self.semantic[sem].ty) {
+                        Val::Value(TypeData::Function { argument_type, .. }) => *argument_type,
+                        Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
+                    },
                     ScopeItem::Type(ty) => ty,
                 };
 
@@ -176,7 +172,7 @@ impl Inferrer<'_> {
 
                 self.infer_expression(scope, expr);
 
-                match self.types.get_val(self.semantic.get_mut(expr).unwrap().ty) {
+                match self.types.get_val(self.semantic[expr].ty) {
                     Val::None => panic!(),
                     Val::Sentinel(sentinel) => match sentinel {
                         TypeSentinel::Unknown => {}
@@ -201,7 +197,7 @@ impl Inferrer<'_> {
                 self.infer_expression(scope, function);
                 self.infer_expression(scope, argument);
 
-                match self.types.get_val(self.semantic.get(function).unwrap().ty) {
+                match self.types.get_val(self.semantic[function].ty) {
                     Val::Value(TypeData::Function { return_type, .. }) => {
                         self.add_type(i, *return_type);
                     }
@@ -237,8 +233,8 @@ impl Inferrer<'_> {
                 self.infer_expression(scope, then);
                 self.infer_expression(scope, else_);
 
-                let then_type = self.semantic.get(then).unwrap().ty;
-                let else_type = self.semantic.get(then).unwrap().ty;
+                let then_type = self.semantic[then].ty;
+                let else_type = self.semantic[then].ty;
 
                 self.add_type(then, else_type);
                 self.add_type(else_, then_type);
@@ -253,7 +249,7 @@ impl Inferrer<'_> {
                 let type_ = self.types.push(TypeData::Product {
                     fields: fields
                         .iter()
-                        .map(|(name, value)| (name.clone(), self.semantic.get(*value).unwrap().ty))
+                        .map(|(name, value)| (name.clone(), self.semantic[*value].ty))
                         .collect::<Vec<(String, Type)>>(),
                 });
 
@@ -271,9 +267,7 @@ impl Inferrer<'_> {
 
                 self.infer_expression(scope, expression);
 
-                if let Some(sem_data) = self.semantic.get(expression) {
-                    self.add_type(i, sem_data.ty);
-                }
+                self.add_type(i, self.semantic[expression].ty);
             }
             SemKind::ChainClosed { statements } => {
                 for statement in statements.clone() {

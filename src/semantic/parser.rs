@@ -37,7 +37,7 @@ impl Parser<'_> {
     }
 
     fn parse_root(&mut self) {
-        let Some(SynData::Root(sems)) = &self.syntax.get(syntax::ROOT_SYN) else {
+        let SynData::Root(sems) = &self.syntax[syntax::ROOT_SYN] else {
             panic!();
         };
 
@@ -50,11 +50,11 @@ impl Parser<'_> {
         let bindings = sems
             .iter()
             .map(|&sem| {
-                let Some(SynData::Binding { pattern, value }) = self.syntax.get(sem) else {
+                let SynData::Binding { pattern, value } = &self.syntax[sem] else {
                     panic!()
                 };
 
-                let Some(SynData::Ident(token)) = self.syntax.get(*pattern) else {
+                let SynData::Ident(token) = &self.syntax[*pattern] else {
                     panic!()
                 };
 
@@ -64,24 +64,18 @@ impl Parser<'_> {
             })
             .collect();
 
-        match self.semantic.get_mut(root) {
-            Some(sem_data) => {
-                *sem_data = SemData {
-                    kind: SemKind::Module { bindings },
-                    ty: TypeSentinel::Unknown.to_index(),
-                }
-            }
-            _ => panic!(),
+        self.semantic[root] = SemData {
+            kind: SemKind::Module { bindings },
+            ty: TypeSentinel::Unknown.to_index(),
         };
     }
 
     fn add_type(&mut self, sem: Sem, type_: Type) {
-        let sem_data = self.semantic.get_mut(sem).unwrap();
-        sem_data.ty = combine_types(&mut self.types, sem_data.ty, type_);
+        self.semantic[sem].ty = combine_types(&mut self.types, self.semantic[sem].ty, type_);
     }
 
     fn parse_expression(&mut self, i: Syn) -> Sem {
-        match self.syntax.get(i).unwrap() {
+        match &self.syntax[i] {
             SynData::Ident(token) => self.push(SemKind::Reference {
                 name: token::parse_identifer(self.source, self.tokens, *token).to_string(),
             }),
@@ -93,20 +87,20 @@ impl Parser<'_> {
                     name: "__param".to_string(),
                 });
 
-                let (pattern, return_type) = if let Some(SynData::ReturnAscription {
+                let (pattern, return_type) = if let SynData::ReturnAscription {
                     syn: pattern,
                     type_: return_type,
-                }) = &self.syntax.get(*pattern)
+                } = &self.syntax[*pattern]
                 {
                     (pattern, self.parse_type(*return_type))
                 } else {
                     (pattern, TypeSentinel::Unknown.to_index())
                 };
 
-                let (pattern, argument_type) = if let Some(SynData::Ascription {
+                let (pattern, argument_type) = if let SynData::Ascription {
                     type_: argument_type,
                     ..
-                }) = &self.syntax.get(*pattern)
+                } = &self.syntax[*pattern]
                 {
                     (pattern, self.parse_type(*argument_type))
                 } else {
@@ -207,7 +201,7 @@ impl Parser<'_> {
         let mut expressions = Vec::new();
 
         while let Some(syn) = syns.next() {
-            match self.syntax.get(syn).unwrap() {
+            match &self.syntax[syn] {
                 SynData::Binding { pattern, value } => {
                     let value = self.parse_expression(*value);
                     let body = self.parse_chain(syns, closed);
@@ -237,7 +231,7 @@ impl Parser<'_> {
     }
 
     fn sift_through_pattern(&mut self, value: Sem, pattern: Syn, body: Sem) -> (Sem, Type) {
-        match self.syntax.get(pattern).unwrap() {
+        match &self.syntax[pattern] {
             SynData::Ident(token) => (
                 self.push(SemKind::Binding {
                     name: token::parse_identifer(self.source, self.tokens, *token).to_string(),
@@ -286,7 +280,7 @@ impl Parser<'_> {
     }
 
     fn parse_type(&mut self, i: Syn) -> Type {
-        match self.syntax.get(i).unwrap() {
+        match &self.syntax[i] {
             SynData::Ident(token) => {
                 match token::parse_identifer(self.source, self.tokens, *token) {
                     "u32" => TypeSentinel::Uint32.to_index(),

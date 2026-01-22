@@ -42,7 +42,7 @@ impl Debug for DebugSem<'_> {
                 .finish()
         };
 
-        let sem_data = self.semantic.get(self.sem).unwrap();
+        let sem_data = &self.semantic[self.sem];
 
         match &sem_data.kind {
             SemKind::Number(_) => display("number", &[]),
