@@ -87,8 +87,7 @@ impl Inferrer<'_> {
                 scope.insert(argument.clone(), ScopeItem::Argument(i));
 
                 {
-                    let (argument_type, return_type) = match self.types.get_val(self.semantic[i].ty)
-                    {
+                    let (argument_type, return_type) = match self.types.get(self.semantic[i].ty) {
                         Val::None => panic!(),
                         Val::Sentinel(_) => panic!(),
                         Val::Value(type_data) => match type_data {
@@ -116,7 +115,7 @@ impl Inferrer<'_> {
                 {
                     let sem_type = self.semantic[i].ty;
 
-                    let (argument_type, return_type) = match &self.types.get_val(sem_type) {
+                    let (argument_type, return_type) = match &self.types.get(sem_type) {
                         Val::Value(TypeData::Function {
                             argument_type,
                             return_type,
@@ -157,7 +156,7 @@ impl Inferrer<'_> {
             SemKind::Reference { name } => {
                 let type_ = match scope[name] {
                     ScopeItem::Sem(sem) => self.semantic[sem].ty,
-                    ScopeItem::Argument(sem) => match self.types.get_val(self.semantic[sem].ty) {
+                    ScopeItem::Argument(sem) => match self.types.get(self.semantic[sem].ty) {
                         Val::Value(TypeData::Function { argument_type, .. }) => *argument_type,
                         Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
                     },
@@ -172,7 +171,7 @@ impl Inferrer<'_> {
 
                 self.infer_expression(scope, expr);
 
-                match self.types.get_val(self.semantic[expr].ty) {
+                match self.types.get(self.semantic[expr].ty) {
                     Val::None => panic!(),
                     Val::Sentinel(sentinel) => match sentinel {
                         TypeSentinel::Unknown => {}
@@ -197,7 +196,7 @@ impl Inferrer<'_> {
                 self.infer_expression(scope, function);
                 self.infer_expression(scope, argument);
 
-                match self.types.get_val(self.semantic[function].ty) {
+                match self.types.get(self.semantic[function].ty) {
                     Val::Value(TypeData::Function { return_type, .. }) => {
                         self.add_type(i, *return_type);
                     }

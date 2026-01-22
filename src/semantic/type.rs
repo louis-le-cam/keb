@@ -28,7 +28,7 @@ pub type Types = KeyVec<TypeSentinel, TypeData>;
 // Combine two source of informations into one, panicking if there is any
 // mismatch.
 pub fn combine_types(types: &mut Types, lhs: Type, rhs: Type) -> Type {
-    match (types.get_val(lhs), types.get_val(rhs)) {
+    match (types.get(lhs), types.get(rhs)) {
         (Val::Sentinel(TypeSentinel::Unknown), _) => rhs,
         (_, Val::Sentinel(TypeSentinel::Unknown)) => lhs,
         (Val::Sentinel(TypeSentinel::Unit), Val::Sentinel(TypeSentinel::Unit)) => {
@@ -71,7 +71,7 @@ pub fn combine_types(types: &mut Types, lhs: Type, rhs: Type) -> Type {
 }
 
 pub fn types_equals(types: &Types, lhs: Type, rhs: Type) -> bool {
-    match (types.get_val(lhs), types.get_val(rhs)) {
+    match (types.get(lhs), types.get(rhs)) {
         (Val::Sentinel(TypeSentinel::Unknown), Val::Sentinel(TypeSentinel::Unknown)) => true,
         (Val::Sentinel(TypeSentinel::Unit), Val::Sentinel(TypeSentinel::Unit)) => true,
         (Val::Sentinel(TypeSentinel::Uint32), Val::Sentinel(TypeSentinel::Uint32)) => true,

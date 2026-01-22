@@ -117,7 +117,7 @@ impl Debug for DebugSem<'_> {
                 .finish(),
         }?;
 
-        f.write_str(&match self.types.get_val(sem_data.ty) {
+        f.write_str(&match self.types.get(sem_data.ty) {
             Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => ": unknown".bright_blue().to_string(),

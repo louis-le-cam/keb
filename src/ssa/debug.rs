@@ -141,7 +141,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
 }
 
 fn debug_type(types: &Types, type_: Type) {
-    match types.get_val(type_) {
+    match types.get(type_) {
         Val::None => panic!(),
         Val::Sentinel(sentinel) => print!("{}", format!("{sentinel:?}").bright_blue()),
         Val::Value(type_data) => match type_data {

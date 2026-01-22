@@ -282,7 +282,7 @@ impl Generator<'_> {
     }
 
     fn generate_type(&mut self, type_: Type) -> String {
-        let c_type = match self.types.get_val(type_) {
+        let c_type = match self.types.get(type_) {
             Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
@@ -324,7 +324,7 @@ impl Generator<'_> {
 
     fn generate_expr(&mut self, expr: Expr) -> String {
         match expr {
-            Expr::Const(const_) => match self.ssa.consts.get_val(const_) {
+            Expr::Const(const_) => match self.ssa.consts.get(const_) {
                 Val::None => panic!(),
                 Val::Sentinel(sentinel) => match sentinel {
                     ConstSentinel::Unit => panic!(),

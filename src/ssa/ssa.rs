@@ -30,7 +30,7 @@ impl Ssa {
 
                 let record_type = self.expression_type(types, *expr);
 
-                match types.get_val(record_type) {
+                match types.get(record_type) {
                     Val::Value(TypeData::Product { fields }) => fields[field as usize].1,
                     Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
                 }
@@ -50,7 +50,7 @@ impl Ssa {
     }
 
     pub fn const_type(&self, const_: Const) -> Type {
-        match self.consts.get_val(const_) {
+        match self.consts.get(const_) {
             Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 ConstSentinel::Unit => TypeSentinel::Unit.to_index(),

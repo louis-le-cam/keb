@@ -63,7 +63,7 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut 
         let Val::Value(TypeData::Function {
             argument_type,
             return_type,
-        }) = types.get_val(*ty)
+        }) = types.get(*ty)
         else {
             panic!()
         };
@@ -128,7 +128,7 @@ fn generate_expression(
         }
         SemKind::Reference { name } => bindings[name],
         SemKind::Access { field, expr } => {
-            let field_index = match types.get_val(semantic[*expr].ty) {
+            let field_index = match types.get(semantic[*expr].ty) {
                 Val::Value(TypeData::Product { fields }) => {
                     fields.iter().position(|(name, _)| field == name).unwrap()
                 }

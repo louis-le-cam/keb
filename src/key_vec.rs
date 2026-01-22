@@ -22,11 +22,11 @@
 //! [`NonEmptySentinel`] and [`EmptySentinel`] are used to provide more
 //! ergonomics to the indexing of the [`KeyVec`].
 //!
-//! On a [`KeyVec`] with [`EmptySentinel`], we can use [`KeyVec::get`] and
-//! [`KeyVec::get_mut`] to get a value.
+//! On a [`KeyVec`] with [`EmptySentinel`], we can use indexing syntax for
+//! getting elements.
 //!
-//! On a [`KeyVec`] with a [`NonEmptySentinel`], we can use [`KeyVec::get_val`]
-//! and [`KeyVec::get_val_mut`].
+//! On a [`KeyVec`] with a [`NonEmptySentinel`], we can use [`KeyVec::get`] and
+//! [`KeyVec::get_mut`].
 //!
 //! A [`EmptySentinel`] kind of defy the purpose of a sentinel, it is only used
 //! as a marker for the collection.
@@ -86,7 +86,7 @@ impl<S: Sentinel, V> KeyVec<S, V> {
 }
 
 impl<S: NonEmptySentinel, V> KeyVec<S, V> {
-    pub fn get_val(&self, index: Index<S>) -> Val<S, &V> {
+    pub fn get(&self, index: Index<S>) -> Val<S, &V> {
         match S::from_index(index) {
             Some(sentinel) => Val::Sentinel(sentinel),
             None => match self.0.get(index.index as usize) {
@@ -96,7 +96,7 @@ impl<S: NonEmptySentinel, V> KeyVec<S, V> {
         }
     }
 
-    pub fn get_val_mut(&mut self, index: Index<S>) -> Val<S, &mut V> {
+    pub fn get_mut(&mut self, index: Index<S>) -> Val<S, &mut V> {
         match S::from_index(index) {
             Some(sentinel) => Val::Sentinel(sentinel),
             None => match self.0.get_mut(index.index as usize) {
