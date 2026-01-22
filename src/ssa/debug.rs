@@ -40,7 +40,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                 println!();
                 insts
             }
-            // Maybe not print block here ?
+            // Maybe not print block here?
             BlockData::Block { arg, insts } => {
                 print!("{}", format!("@{} ", block.as_u32()).bright_yellow());
                 debug_type(types, *arg);

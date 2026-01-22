@@ -39,7 +39,7 @@ pub fn lex(source: &str) -> Tokens {
                     TokenKind::StringStart
                 }
 
-                // TODO: allow multi-line comments (with `/**/` ?)
+                // TODO: allow multi-line comments (with `/**/`?)
                 // QUESTION: should we use `#` or `//` for single line comments
                 // - `#` is the unix standard, if we use it, we don't have to
                 //   care about shebangs, it is also concise
