@@ -172,7 +172,7 @@ mod derive {
             // SAFETY: Guarrantee that the enum has size `0`.
             const _: () = ::core::assert!(::core::mem::size_of::<$name>() == 0);
             // SAFETY: Guarrantee that the enum has no variant, i.e. the enum
-            // is inhabited.
+            // is not inhabited.
             const _: () = {
                 let _ = |value: $name| match value {};
             };
@@ -180,7 +180,7 @@ mod derive {
             // SAFETY: We triple check that the enum is empty.
             // - The derive macro syntax parses only enum with no variants
             // - We assert at compile-time that the size of the `enum` is `0`
-            // - We assert that the `enum` is inhabited with a empty `match`
+            // - We assert that the `enum` is not inhabited with a empty `match`
             unsafe impl $crate::key_vec::EmptySentinel for $name { }
 
             impl $crate::key_vec::Sentinel for $name {
