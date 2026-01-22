@@ -4,7 +4,7 @@ use colored::Colorize as _;
 
 use crate::{
     key_vec::Val,
-    semantic::{ROOT_SEM, Sem, SemKind, Semantic, TypeSentinel, Types},
+    semantic::{ROOT_SEM, Sem, SemKind, Semantic, Type, TypeData, TypeSentinel, Types},
 };
 
 pub fn debug(semantic: &Semantic, types: &Types) {
@@ -117,21 +117,8 @@ impl Debug for DebugSem<'_> {
                 .finish(),
         }?;
 
-        f.write_str(&match self.types.get(sem_data.ty) {
-            Val::None => panic!(),
-            Val::Sentinel(sentinel) => match sentinel {
-                TypeSentinel::Unknown => ": unknown".bright_blue().to_string(),
-                TypeSentinel::Unit => ": ()".bright_blue().to_string(),
-                TypeSentinel::Uint32 => ": u32".bright_blue().to_string(),
-                TypeSentinel::Bool => ": bool".bright_blue().to_string(),
-                TypeSentinel::False => ": false".bright_blue().to_string(),
-                TypeSentinel::True => ": true".bright_blue().to_string(),
-            },
-            Val::Value(type_data) => format!(": {:?}", type_data)
-                .to_string()
-                .bright_blue()
-                .to_string(),
-        })
+        f.write_str(&": ".white().to_string())?;
+        f.write_str(&debug_type(self.types, sem_data.ty))
     }
 }
 
@@ -140,5 +127,49 @@ struct DebugUsingDisplay<T>(T);
 impl<T: Display> Debug for DebugUsingDisplay<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+pub fn debug_type(types: &Types, type_: Type) -> String {
+    match types.get(type_) {
+        Val::None => panic!(),
+        Val::Sentinel(sentinel) => {
+            let text = match sentinel {
+                TypeSentinel::Unknown => "unknown",
+                TypeSentinel::Unit => "()",
+                TypeSentinel::Uint32 => "u32",
+                TypeSentinel::Bool => "bool",
+                TypeSentinel::False => "false",
+                TypeSentinel::True => "true",
+            };
+
+            text.bright_blue().to_string()
+        }
+        Val::Value(type_data) => match type_data {
+            TypeData::Function {
+                argument_type,
+                return_type,
+            } => {
+                let mut text = debug_type(types, *argument_type);
+                text.push_str(" -> ");
+                text.push_str(&debug_type(types, *return_type));
+                text
+            }
+            TypeData::Product { fields } => {
+                let mut text = "(".to_string();
+
+                for (i, (_, field)) in fields.iter().enumerate() {
+                    if i != 0 {
+                        text.push_str(", ");
+                    }
+
+                    text.push_str(&debug_type(types, *field));
+                }
+
+                text.push(')');
+
+                text
+            }
+        },
     }
 }

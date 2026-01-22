@@ -1,9 +1,6 @@
 use colored::Colorize as _;
 
-use crate::{
-    key_vec::Val,
-    semantic::{Type, TypeData, TypeSentinel, Types},
-};
+use crate::semantic::{Types, debug_type};
 
 use super::*;
 
@@ -11,16 +8,14 @@ pub fn debug(types: &Types, ssa: &Ssa) {
     for (block, block_data) in ssa.blocks.entries() {
         let insts = match block_data {
             BlockData::ExternFunction { name, arg, ret } => {
-                print!(
-                    "{} {} {} ",
+                println!(
+                    "{} {} {} {} -> {}",
                     format!("@{}", block.as_u32()).bright_yellow(),
                     "extern".bright_red().bold(),
                     name.bright_yellow(),
+                    debug_type(types, *arg),
+                    debug_type(types, *ret),
                 );
-                debug_type(types, *arg);
-                print!(" -> ");
-                debug_type(types, *ret);
-                println!("\n");
                 continue;
             }
             BlockData::Function {
@@ -29,22 +24,22 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                 ret,
                 insts,
             } => {
-                print!(
-                    "{} {} ",
+                println!(
+                    "{} {} {} -> {}",
                     format!("@{}", block.as_u32()).bright_yellow(),
-                    name.bright_yellow()
+                    name.bright_yellow(),
+                    debug_type(types, *arg),
+                    debug_type(types, *ret),
                 );
-                debug_type(types, *arg);
-                print!(" -> ");
-                debug_type(types, *ret);
-                println!();
                 insts
             }
             // Maybe not print block here?
             BlockData::Block { arg, insts } => {
-                print!("{}", format!("@{} ", block.as_u32()).bright_yellow());
-                debug_type(types, *arg);
-                println!();
+                println!(
+                    "{} {}",
+                    format!("@{}", block.as_u32()).bright_yellow(),
+                    debug_type(types, *arg),
+                );
                 insts
             }
         };
@@ -138,37 +133,6 @@ pub fn debug(types: &Types, ssa: &Ssa) {
         }
         println!("{}", ";".white());
     }
-}
-
-fn debug_type(types: &Types, type_: Type) {
-    match types.get(type_) {
-        Val::None => panic!(),
-        Val::Sentinel(sentinel) => {
-            let text = match sentinel {
-                TypeSentinel::Unknown => "unknown",
-                TypeSentinel::Unit => "()",
-                TypeSentinel::Uint32 => "u32",
-                TypeSentinel::Bool => "bool",
-                TypeSentinel::False => "false",
-                TypeSentinel::True => "true",
-            };
-            print!("{}", text.bright_blue())
-        }
-        Val::Value(type_data) => match type_data {
-            TypeData::Function { .. } => todo!(),
-            TypeData::Product { fields } => {
-                print!("(");
-                for (i, (_, field)) in fields.iter().enumerate() {
-                    if i != 0 {
-                        print!(", ");
-                    }
-
-                    debug_type(types, *field);
-                }
-                print!(")");
-            }
-        },
-    };
 }
 
 fn debug_expr(expr: &Expr) {
