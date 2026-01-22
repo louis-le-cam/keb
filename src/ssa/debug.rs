@@ -2,7 +2,7 @@ use colored::Colorize as _;
 
 use crate::{
     key_vec::Val,
-    semantic::{Type, TypeData, Types},
+    semantic::{Type, TypeData, TypeSentinel, Types},
 };
 
 use super::*;
@@ -143,7 +143,17 @@ pub fn debug(types: &Types, ssa: &Ssa) {
 fn debug_type(types: &Types, type_: Type) {
     match types.get(type_) {
         Val::None => panic!(),
-        Val::Sentinel(sentinel) => print!("{}", format!("{sentinel:?}").bright_blue()),
+        Val::Sentinel(sentinel) => {
+            let text = match sentinel {
+                TypeSentinel::Unknown => "unknown",
+                TypeSentinel::Unit => "()",
+                TypeSentinel::Uint32 => "u32",
+                TypeSentinel::Bool => "bool",
+                TypeSentinel::False => "false",
+                TypeSentinel::True => "true",
+            };
+            print!("{}", text.bright_blue())
+        }
         Val::Value(type_data) => match type_data {
             TypeData::Function { .. } => todo!(),
             TypeData::Product { fields } => {
