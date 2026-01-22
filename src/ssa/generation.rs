@@ -17,7 +17,7 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut 
         ssa: Ssa::default(),
     };
 
-    generator.generate();
+    generator.generate_module();
 
     generator.ssa
 }
@@ -31,7 +31,7 @@ struct Generator<'a> {
 }
 
 impl Generator<'_> {
-    fn generate(&mut self) {
+    fn generate_module(&mut self) {
         let SemData {
             kind: SemKind::Module { bindings },
             ..
