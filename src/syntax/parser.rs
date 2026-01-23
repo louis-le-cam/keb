@@ -2,14 +2,14 @@ use std::iter::Peekable;
 
 use crate::{
     syntax::{self, StringSegment, Syn, SynData, Syntax},
-    token::{Token, TokenKind, Tokens},
+    token::{Token, TokenKind, TokenKinds},
 };
 
-pub fn parse(tokens: &Tokens) -> Syntax {
+pub fn parse(tokens: &TokenKinds) -> Syntax {
     let mut parser = Parser {
         tokens: tokens
             .entries()
-            .map(|(token, (_, kind))| (token, *kind))
+            .map(|(token, kind)| (token, *kind))
             .peekable(),
         syntax: Syntax::default(),
     };

@@ -4,10 +4,10 @@ use crate::{
         self, Sem, SemData, SemKind, Semantic, Type, TypeData, TypeSentinel, Types, combine_types,
     },
     syntax::{self, Syn, SynData, Syntax},
-    token::{self, Tokens},
+    token::{self, TokenOffsets},
 };
 
-pub fn parse(source: &str, tokens: &Tokens, syntax: &Syntax) -> (Semantic, Types) {
+pub fn parse(source: &str, tokens: &TokenOffsets, syntax: &Syntax) -> (Semantic, Types) {
     let mut parser = Parser {
         source,
         tokens,
@@ -21,7 +21,7 @@ pub fn parse(source: &str, tokens: &Tokens, syntax: &Syntax) -> (Semantic, Types
 
 struct Parser<'a> {
     source: &'a str,
-    tokens: &'a Tokens,
+    tokens: &'a TokenOffsets,
     syntax: &'a Syntax,
 
     semantic: Semantic,

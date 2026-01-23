@@ -13,15 +13,15 @@ fn main() {
     token::debug(&source, &tokens);
 
     debug_header("SYNTAX");
-    let syntax = syntax::parse(&tokens);
+    let syntax = syntax::parse(&tokens.kinds);
     syntax::debug(&syntax);
 
     debug_header("SEMANTIC");
-    let (mut semantic, mut types) = semantic::parse(&source, &tokens, &syntax);
+    let (mut semantic, mut types) = semantic::parse(&source, &tokens.offsets, &syntax);
     semantic::infer_types(&mut semantic, &mut types);
     semantic::debug(&semantic, &types);
 
-    let ssa = ssa::generate(&source, &tokens, &semantic, &mut types);
+    let ssa = ssa::generate(&source, &tokens.offsets, &semantic, &mut types);
 
     debug_header("SSA");
     ssa::debug(&types, &ssa);

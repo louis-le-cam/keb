@@ -8,7 +8,7 @@ pub fn debug(source: &str, tokens: &Tokens) {
     let mut in_string = false;
     for (token, (i, kind)) in tokens.entries() {
         if !in_string {
-            for whitespace in source[..*i]
+            for whitespace in source[..i]
                 .chars()
                 .rev()
                 .take_while(|char| char.is_whitespace())
@@ -39,8 +39,10 @@ pub fn debug(source: &str, tokens: &Tokens) {
             TokenKind::LeftCurly => "{".bright_white(),
             TokenKind::RightCurly => "}".bright_white(),
 
-            TokenKind::Number => parse_u64(source, tokens, token).to_string().bright_purple(),
-            TokenKind::Ident => parse_identifer(source, tokens, token).bright_cyan(),
+            TokenKind::Number => parse_u64(source, &tokens.offsets, token)
+                .to_string()
+                .bright_purple(),
+            TokenKind::Ident => parse_identifer(source, &tokens.offsets, token).bright_cyan(),
             TokenKind::Let => "let".bright_red(),
             TokenKind::Loop => "loop".bright_red(),
             TokenKind::If => "if".bright_red(),
@@ -57,10 +59,10 @@ pub fn debug(source: &str, tokens: &Tokens) {
                 in_string = false;
                 "\"".bright_yellow().bold()
             }
-            TokenKind::StringSegment => parse_string_segment(source, tokens, token)
+            TokenKind::StringSegment => parse_string_segment(source, &tokens.offsets, token)
                 .bright_yellow()
                 .underline(),
-            TokenKind::StringEscape => parse_string_escape(source, tokens, token)
+            TokenKind::StringEscape => parse_string_escape(source, &tokens.offsets, token)
                 .escape_default()
                 .to_string()
                 .bright_yellow()

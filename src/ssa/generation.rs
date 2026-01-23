@@ -3,12 +3,17 @@ use std::collections::HashMap;
 use crate::{
     key_vec::{Sentinel, Val},
     semantic::{self, Sem, SemData, SemKind, Semantic, TypeData, TypeSentinel, Types},
-    token::{self, Tokens},
+    token::{self, TokenOffsets},
 };
 
 use super::*;
 
-pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut Types) -> Ssa {
+pub fn generate(
+    source: &str,
+    tokens: &TokenOffsets,
+    semantic: &Semantic,
+    types: &mut Types,
+) -> Ssa {
     let mut generator = Generator {
         source,
         tokens,
@@ -24,7 +29,7 @@ pub fn generate(source: &str, tokens: &Tokens, semantic: &Semantic, types: &mut 
 
 struct Generator<'a> {
     source: &'a str,
-    tokens: &'a Tokens,
+    tokens: &'a TokenOffsets,
     semantic: &'a Semantic,
     types: &'a mut Types,
     ssa: Ssa,
@@ -125,7 +130,7 @@ impl Generator<'_> {
     ) -> Expr {
         match &self.semantic[sem].kind {
             SemKind::Number(token) => {
-                let value = token::parse_u64(self.source, self.tokens, *token) as u32;
+                let value = token::parse_u64(self.source, &self.tokens, *token) as u32;
                 Expr::Const(self.ssa.const_u32(value))
             }
             SemKind::False(_) => Expr::Const(ConstSentinel::False.to_index()),

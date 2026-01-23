@@ -1,4 +1,4 @@
-use crate::token::{TokenKind, Tokens};
+use crate::token::{TokenKind, TokenKinds, TokenOffsets, Tokens};
 
 pub fn lex(source: &str) -> Tokens {
     let mut chars = source.char_indices().peekable();
@@ -136,5 +136,10 @@ pub fn lex(source: &str) -> Tokens {
         }
     });
 
-    Tokens::from_vec(tokens.collect())
+    let (offsets, kinds) = tokens.unzip();
+
+    Tokens {
+        offsets: TokenOffsets::from_vec(offsets),
+        kinds: TokenKinds::from_vec(kinds),
+    }
 }

@@ -11,10 +11,10 @@ use keb::{c, semantic, ssa, syntax, token};
 
 fn test_program(source: &str, expected_output: &str) {
     let tokens = token::lex(&source);
-    let syntax = syntax::parse(&tokens);
-    let (mut semantic, mut types) = semantic::parse(&source, &tokens, &syntax);
+    let syntax = syntax::parse(&tokens.kinds);
+    let (mut semantic, mut types) = semantic::parse(&source, &tokens.offsets, &syntax);
     semantic::infer_types(&mut semantic, &mut types);
-    let ssa = ssa::generate(&source, &tokens, &semantic, &mut types);
+    let ssa = ssa::generate(&source, &tokens.offsets, &semantic, &mut types);
     let c = c::generate(&types, &ssa);
 
     let program_path = temp_dir().join(format!("keb-test-c-output-{:0>32x}.c", random::<u128>(..)));

@@ -43,4 +43,20 @@ pub enum TokenKind {
 pub enum TokenSentinel {}
 
 pub type Token = Index<TokenSentinel>;
-pub type Tokens = KeyVec<TokenSentinel, (usize, TokenKind)>;
+
+pub type TokenOffsets = KeyVec<TokenSentinel, usize>;
+pub type TokenKinds = KeyVec<TokenSentinel, TokenKind>;
+
+pub struct Tokens {
+    pub offsets: TokenOffsets,
+    pub kinds: TokenKinds,
+}
+
+impl Tokens {
+    pub fn entries(&self) -> impl Iterator<Item = (Token, (usize, TokenKind))> {
+        self.offsets
+            .entries()
+            .zip(self.kinds.entries())
+            .map(|((token, offset), (_, kind))| (token, (*offset, *kind)))
+    }
+}
