@@ -1,4 +1,6 @@
-use crate::token::{Token, TokenOffsets};
+use crate::token::{Token, TokenOffsets, Tokens};
+
+use super::TokenKind;
 
 pub fn parse_identifer<'a>(source: &'a str, tokens: &TokenOffsets, token: Token) -> &'a str {
     let source_from_token = &source[tokens[token]..];
@@ -59,5 +61,45 @@ pub fn parse_string_escape(source: &str, tokens: &TokenOffsets, token: Token) ->
         '\\' => '\\',
         '{' => '{',
         _ => panic!(),
+    }
+}
+
+pub fn token_length(source: &str, tokens: &Tokens, token: Token) -> usize {
+    match tokens.kinds[token] {
+        TokenKind::EqualGreater | TokenKind::HyphenGreater => 2,
+        TokenKind::Equal
+        | TokenKind::Plus
+        | TokenKind::Hyphen
+        | TokenKind::Star
+        | TokenKind::Slash
+        | TokenKind::Comma
+        | TokenKind::Semicolon
+        | TokenKind::Colon
+        | TokenKind::Dot
+        | TokenKind::LeftParen
+        | TokenKind::RightParen
+        | TokenKind::LeftCurly
+        | TokenKind::RightCurly => 1,
+        TokenKind::Number => {
+            let source_from_token = &source[tokens.offsets[token]..];
+            source_from_token
+                .char_indices()
+                .skip(1)
+                .find(|(_, ch)| !matches!(ch, '0'..='9'))
+                .map(|(i, _)| i)
+                .unwrap_or(source_from_token.len())
+        }
+        TokenKind::Ident
+        | TokenKind::Let
+        | TokenKind::Loop
+        | TokenKind::If
+        | TokenKind::Then
+        | TokenKind::Else
+        | TokenKind::False
+        | TokenKind::True => parse_identifer(source, &tokens.offsets, token).len(),
+        TokenKind::StringStart | TokenKind::StringEnd => 1,
+        TokenKind::StringSegment => parse_string_segment(source, &tokens.offsets, token).len(),
+        TokenKind::StringEscape => 2,
+        TokenKind::InterpolationStart | TokenKind::InterpolationEnd => 1,
     }
 }
