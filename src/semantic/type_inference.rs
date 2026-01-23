@@ -235,7 +235,7 @@ impl Inferrer<'_> {
                 self.infer_expression(scope, else_);
 
                 let then_type = self.semantic[then].ty;
-                let else_type = self.semantic[then].ty;
+                let else_type = self.semantic[else_].ty;
 
                 self.add_type(then, else_type);
                 self.add_type(else_, then_type);
