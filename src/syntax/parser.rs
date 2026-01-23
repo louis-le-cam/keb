@@ -134,19 +134,41 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
     }
 
     fn parse_additive(&mut self) -> Option<Syn> {
-        let mut syn = self.parse_ascription()?;
+        let mut syn = self.parse_multiplicative()?;
 
         loop {
             match self.tokens.peek() {
                 Some((_, TokenKind::Plus)) => {
                     self.tokens.next();
-                    let rhs = self.parse_ascription().unwrap();
+                    let rhs = self.parse_multiplicative().unwrap();
                     syn = self.syntax.push(SynData::Add(syn, rhs))
                 }
                 Some((_, TokenKind::Hyphen)) => {
                     self.tokens.next();
-                    let rhs = self.parse_ascription().unwrap();
+                    let rhs = self.parse_multiplicative().unwrap();
                     syn = self.syntax.push(SynData::Subtract(syn, rhs))
+                }
+                _ => break,
+            }
+        }
+
+        Some(syn)
+    }
+
+    fn parse_multiplicative(&mut self) -> Option<Syn> {
+        let mut syn = self.parse_ascription()?;
+
+        loop {
+            match self.tokens.peek() {
+                Some((_, TokenKind::Star)) => {
+                    self.tokens.next();
+                    let rhs = self.parse_ascription().unwrap();
+                    syn = self.syntax.push(SynData::Multiply(syn, rhs))
+                }
+                Some((_, TokenKind::Slash)) => {
+                    self.tokens.next();
+                    let rhs = self.parse_ascription().unwrap();
+                    syn = self.syntax.push(SynData::Divide(syn, rhs))
                 }
                 _ => break,
             }
@@ -215,8 +237,10 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             TokenKind::EqualGreater
             | TokenKind::HyphenGreater
             | TokenKind::Equal
-            | TokenKind::Hyphen
             | TokenKind::Plus
+            | TokenKind::Hyphen
+            | TokenKind::Star
+            | TokenKind::Slash
             | TokenKind::Comma
             | TokenKind::Semicolon
             | TokenKind::Colon

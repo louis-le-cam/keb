@@ -36,7 +36,10 @@ impl Ssa {
                 }
             }
             InstData::Record(_, ty) => *ty,
-            InstData::Add(lhs, _) => self.expression_type(types, *lhs),
+            InstData::Add(lhs, _)
+            | InstData::Sub(lhs, _)
+            | InstData::Mul(lhs, _)
+            | InstData::Div(lhs, _) => self.expression_type(types, *lhs),
             InstData::Call {
                 function: block, ..
             } => match &self.blocks[*block] {
@@ -114,7 +117,7 @@ impl Ssa {
         self.const_(ConstData::Uint32(value))
     }
 
-    fn inst(&mut self, block: Block, inst_data: InstData) -> Inst {
+    pub fn inst(&mut self, block: Block, inst_data: InstData) -> Inst {
         let inst = self.insts.push(inst_data);
 
         match &mut self.blocks[block] {
@@ -146,10 +149,6 @@ impl Ssa {
         };
 
         self.inst(block, InstData::Record(fields, type_))
-    }
-
-    pub fn inst_add(&mut self, block: Block, lhs: Expr, rhs: Expr) -> Inst {
-        self.inst(block, InstData::Add(lhs, rhs))
     }
 
     pub fn inst_call(&mut self, block: Block, target_function: Block, argument: Expr) -> Inst {
@@ -240,6 +239,9 @@ pub enum InstData {
     Field(Expr, u32),
     Record(Vec<Expr>, Type),
     Add(Expr, Expr),
+    Sub(Expr, Expr),
+    Mul(Expr, Expr),
+    Div(Expr, Expr),
     Call {
         function: Block,
         argument: Expr,

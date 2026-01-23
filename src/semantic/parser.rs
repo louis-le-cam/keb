@@ -126,23 +126,10 @@ impl Parser<'_> {
 
                 sem
             }
-            SynData::Add(lhs, rhs) => {
-                let lhs = self.parse_expression(*lhs);
-                let rhs = self.parse_expression(*rhs);
-
-                let structure = self.push(SemKind::BuildStruct {
-                    fields: vec![("0".to_string(), lhs), ("1".to_string(), rhs)],
-                });
-
-                let add_function = self.push(SemKind::Reference {
-                    name: "builtin_add".to_string(),
-                });
-
-                self.push(SemKind::Application {
-                    function: add_function,
-                    argument: structure,
-                })
-            }
+            SynData::Add(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_add"),
+            SynData::Subtract(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_sub"),
+            SynData::Multiply(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_mul"),
+            SynData::Divide(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_div"),
             SynData::Application { function, argument } => {
                 let function = self.parse_expression(*function);
                 let argument = self.parse_expression(*argument);
@@ -195,6 +182,24 @@ impl Parser<'_> {
             ),
             expr => panic!("{expr:?}"),
         }
+    }
+
+    fn parse_binary_operator(&mut self, lhs: Syn, rhs: Syn, function: &str) -> Sem {
+        let lhs = self.parse_expression(lhs);
+        let rhs = self.parse_expression(rhs);
+
+        let structure = self.push(SemKind::BuildStruct {
+            fields: vec![("0".to_string(), lhs), ("1".to_string(), rhs)],
+        });
+
+        let add_function = self.push(SemKind::Reference {
+            name: function.to_string(),
+        });
+
+        self.push(SemKind::Application {
+            function: add_function,
+            argument: structure,
+        })
     }
 
     fn parse_chain(&mut self, mut syns: impl Iterator<Item = Syn>, closed: bool) -> Sem {

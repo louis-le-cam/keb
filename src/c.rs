@@ -231,6 +231,21 @@ impl Generator<'_> {
                     self.generate_expr(*lhs),
                     self.generate_expr(*rhs),
                 )),
+                InstData::Sub(lhs, rhs) => body.push_str(&format!(
+                    "{} - {}",
+                    self.generate_expr(*lhs),
+                    self.generate_expr(*rhs),
+                )),
+                InstData::Mul(lhs, rhs) => body.push_str(&format!(
+                    "{} * {}",
+                    self.generate_expr(*lhs),
+                    self.generate_expr(*rhs),
+                )),
+                InstData::Div(lhs, rhs) => body.push_str(&format!(
+                    "{} / {}",
+                    self.generate_expr(*lhs),
+                    self.generate_expr(*rhs),
+                )),
                 InstData::Call { function, argument } => match &self.ssa.blocks[*function] {
                     BlockData::ExternFunction { name, .. } | BlockData::Function { name, .. } => {
                         let argument_text = match argument {

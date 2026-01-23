@@ -40,43 +40,40 @@ impl Generator<'_> {
             panic!();
         };
 
-        let builtin_add = {
-            let u32_tuple = self.types.push(TypeData::Product {
-                fields: vec![
-                    (String::new(), TypeSentinel::Uint32.to_index()),
-                    (String::new(), TypeSentinel::Uint32.to_index()),
-                ],
-            });
-            let builtin_add = self.ssa.function(
-                "builtin_add".to_string(),
-                u32_tuple,
+        let mut functions = HashMap::from([(
+            "print".to_string(),
+            self.ssa.extern_function(
+                "builtin_print".to_string(),
                 TypeSentinel::Uint32.to_index(),
-            );
-            let lhs = self
-                .ssa
-                .inst_field(builtin_add, Expr::BlockArg(builtin_add), 0);
-            let rhs = self
-                .ssa
-                .inst_field(builtin_add, Expr::BlockArg(builtin_add), 1);
+                TypeSentinel::Unit.to_index(),
+            ),
+        )]);
+
+        let u32_tuple = self.types.push(TypeData::Product {
+            fields: vec![
+                (String::new(), TypeSentinel::Uint32.to_index()),
+                (String::new(), TypeSentinel::Uint32.to_index()),
+            ],
+        });
+
+        for (name, inst_data) in [
+            ("builtin_add", InstData::Add as fn(Expr, Expr) -> InstData),
+            ("builtin_sub", InstData::Sub),
+            ("builtin_mul", InstData::Mul),
+            ("builtin_div", InstData::Div),
+        ] {
+            let function =
+                self.ssa
+                    .function(name.to_string(), u32_tuple, TypeSentinel::Uint32.to_index());
+            let lhs = self.ssa.inst_field(function, Expr::BlockArg(function), 0);
+            let rhs = self.ssa.inst_field(function, Expr::BlockArg(function), 1);
             let result = self
                 .ssa
-                .inst_add(builtin_add, Expr::Inst(lhs), Expr::Inst(rhs));
-            self.ssa.inst_return(builtin_add, Expr::Inst(result));
+                .inst(function, inst_data(Expr::Inst(lhs), Expr::Inst(rhs)));
+            self.ssa.inst_return(function, Expr::Inst(result));
 
-            builtin_add
-        };
-
-        let mut functions = HashMap::from([
-            (
-                "print".to_string(),
-                self.ssa.extern_function(
-                    "builtin_print".to_string(),
-                    TypeSentinel::Uint32.to_index(),
-                    TypeSentinel::Unit.to_index(),
-                ),
-            ),
-            ("builtin_add".to_string(), builtin_add),
-        ]);
+            functions.insert(name.to_string(), function);
+        }
 
         for (name, value) in bindings {
             let SemData {

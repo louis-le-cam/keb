@@ -45,6 +45,16 @@ pub fn debug(syntax: &Syntax) {
                     .field(&dbg_syn(*lhs))
                     .field(&dbg_syn(*rhs))
                     .finish(),
+                SynData::Multiply(lhs, rhs) => f
+                    .debug_tuple(&"multiply".bright_yellow().to_string())
+                    .field(&dbg_syn(*lhs))
+                    .field(&dbg_syn(*rhs))
+                    .finish(),
+                SynData::Divide(lhs, rhs) => f
+                    .debug_tuple(&"divide".bright_yellow().to_string())
+                    .field(&dbg_syn(*lhs))
+                    .field(&dbg_syn(*rhs))
+                    .finish(),
                 SynData::Binding { pattern, value } => f
                     .debug_tuple(&"let".bright_red().to_string())
                     .field(&dbg_syn(*pattern))

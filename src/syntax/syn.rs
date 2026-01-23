@@ -15,6 +15,8 @@ pub enum SynData {
     Number(Token),
     Add(Syn, Syn),
     Subtract(Syn, Syn),
+    Multiply(Syn, Syn),
+    Divide(Syn, Syn),
     Binding {
         pattern: Syn,
         value: Syn,

@@ -71,8 +71,10 @@ pub fn lex(source: &str) -> Tokens {
                 '=' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::EqualGreater,
                 '-' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::HyphenGreater,
                 '=' => TokenKind::Equal,
-                '-' => TokenKind::Hyphen,
                 '+' => TokenKind::Plus,
+                '-' => TokenKind::Hyphen,
+                '*' => TokenKind::Star,
+                '/' => TokenKind::Slash,
 
                 ',' => TokenKind::Comma,
                 ';' => TokenKind::Semicolon,

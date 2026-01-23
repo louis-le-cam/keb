@@ -69,6 +69,24 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                     print!(", ");
                     debug_expr(rhs);
                 }
+                InstData::Sub(lhs, rhs) => {
+                    print!("{} ", "sub".bright_red().bold());
+                    debug_expr(lhs);
+                    print!(", ");
+                    debug_expr(rhs);
+                }
+                InstData::Mul(lhs, rhs) => {
+                    print!("{} ", "mul".bright_red().bold());
+                    debug_expr(lhs);
+                    print!(", ");
+                    debug_expr(rhs);
+                }
+                InstData::Div(lhs, rhs) => {
+                    print!("{} ", "div".bright_red().bold());
+                    debug_expr(lhs);
+                    print!(", ");
+                    debug_expr(rhs);
+                }
                 InstData::Call { function, argument } => {
                     print!(
                         "{} {}, ",

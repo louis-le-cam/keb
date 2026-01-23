@@ -27,27 +27,29 @@ struct Inferrer<'a> {
 
 impl Inferrer<'_> {
     fn infer_root(&mut self) {
-        let uint32_tuple = self.types.push(TypeData::Product {
-            fields: vec![
-                ("0".to_string(), TypeSentinel::Uint32.to_index()),
-                ("1".to_string(), TypeSentinel::Uint32.to_index()),
-            ],
-        });
-        let builtin_add = self.types.push(TypeData::Function {
-            argument_type: uint32_tuple,
-            return_type: TypeSentinel::Uint32.to_index(),
-        });
-
         let unit = self.types.push(TypeData::Product { fields: Vec::new() });
         let print = self.types.push(TypeData::Function {
             argument_type: TypeSentinel::Uint32.to_index(),
             return_type: unit,
         });
 
-        let scope = Scope::from([
-            ("builtin_add".to_string(), ScopeItem::Type(builtin_add)),
-            ("print".to_string(), ScopeItem::Type(print)),
-        ]);
+        let mut scope = Scope::from([("print".to_string(), ScopeItem::Type(print))]);
+
+        let uint32_tuple = self.types.push(TypeData::Product {
+            fields: vec![
+                ("0".to_string(), TypeSentinel::Uint32.to_index()),
+                ("1".to_string(), TypeSentinel::Uint32.to_index()),
+            ],
+        });
+        let binary_function_type = self.types.push(TypeData::Function {
+            argument_type: uint32_tuple,
+            return_type: TypeSentinel::Uint32.to_index(),
+        });
+
+        for name in ["builtin_add", "builtin_sub", "builtin_mul", "builtin_div"] {
+            scope.insert(name.to_string(), ScopeItem::Type(binary_function_type));
+        }
+
         self.infer_expression(&scope, semantic::ROOT_SEM);
     }
 

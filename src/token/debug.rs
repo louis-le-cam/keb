@@ -24,8 +24,10 @@ pub fn debug(source: &str, tokens: &Tokens) {
             TokenKind::EqualGreater => "=>".bright_yellow(),
             TokenKind::HyphenGreater => "->".bright_yellow(),
             TokenKind::Equal => "=".bright_yellow(),
-            TokenKind::Hyphen => "-".bright_yellow(),
             TokenKind::Plus => "+".bright_yellow(),
+            TokenKind::Hyphen => "-".bright_yellow(),
+            TokenKind::Star => "*".bright_yellow(),
+            TokenKind::Slash => "/".bright_yellow(),
 
             TokenKind::Comma => ",".white(),
             TokenKind::Semicolon => ";".white(),
