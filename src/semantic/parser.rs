@@ -1,7 +1,8 @@
 use crate::{
     key_vec::Sentinel,
     semantic::{
-        self, Sem, SemData, SemKind, Semantic, Type, TypeData, TypeSentinel, Types, combine_types,
+        self, Sem, SemKind, SemKinds, SemTypes, Semantic, Type, TypeData, TypeSentinel, Types,
+        combine_types,
     },
     syntax::{self, Syn, SynData, Syntax},
     token::{self, TokenOffsets},
@@ -12,7 +13,10 @@ pub fn parse(source: &str, tokens: &TokenOffsets, syntax: &Syntax) -> (Semantic,
         source,
         tokens,
         syntax,
-        semantic: Semantic::default(),
+        semantic: Semantic {
+            kinds: SemKinds::default(),
+            types: SemTypes::default(),
+        },
         types: Types::default(),
     };
     parser.parse_root();
@@ -30,10 +34,7 @@ struct Parser<'a> {
 
 impl Parser<'_> {
     fn push(&mut self, kind: SemKind) -> Sem {
-        self.semantic.push(SemData {
-            kind,
-            ty: TypeSentinel::Unknown.to_index(),
-        })
+        self.semantic.push(kind, TypeSentinel::Unknown.to_index())
     }
 
     fn parse_root(&mut self) {
@@ -41,10 +42,10 @@ impl Parser<'_> {
             panic!();
         };
 
-        let root = self.semantic.push(SemData {
-            kind: SemKind::Module { bindings: vec![] },
-            ty: TypeSentinel::Unknown.to_index(),
-        });
+        let root = self.semantic.push(
+            SemKind::Module { bindings: vec![] },
+            TypeSentinel::Unknown.to_index(),
+        );
         assert_eq!(root, semantic::ROOT_SEM);
 
         let bindings = sems
@@ -64,14 +65,11 @@ impl Parser<'_> {
             })
             .collect();
 
-        self.semantic[root] = SemData {
-            kind: SemKind::Module { bindings },
-            ty: TypeSentinel::Unknown.to_index(),
-        };
+        self.semantic.kinds[root] = SemKind::Module { bindings };
     }
 
     fn add_type(&mut self, sem: Sem, type_: Type) {
-        self.semantic[sem].ty = combine_types(&mut self.types, self.semantic[sem].ty, type_);
+        self.semantic.types[sem] = combine_types(&mut self.types, self.semantic.types[sem], type_);
     }
 
     fn parse_expression(&mut self, i: Syn) -> Sem {

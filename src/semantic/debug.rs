@@ -42,9 +42,7 @@ impl Debug for DebugSem<'_> {
                 .finish()
         };
 
-        let sem_data = &self.semantic[self.sem];
-
-        match &sem_data.kind {
+        match &self.semantic.kinds[self.sem] {
             SemKind::Number(_) => display("number", &[]),
             SemKind::False(_) => display("false", &[]),
             SemKind::True(_) => display("true", &[]),
@@ -118,7 +116,7 @@ impl Debug for DebugSem<'_> {
         }?;
 
         f.write_str(&": ".white().to_string())?;
-        f.write_str(&debug_type(self.types, sem_data.ty))
+        f.write_str(&debug_type(self.types, self.semantic.types[self.sem]))
     }
 }
 

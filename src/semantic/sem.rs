@@ -5,12 +5,6 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct SemData {
-    pub kind: SemKind,
-    pub ty: Type,
-}
-
-#[derive(Clone, Debug)]
 pub enum SemKind {
     False(Token),
     True(Token),
@@ -64,6 +58,21 @@ pub enum SemKind {
 pub enum SemSentinel {}
 
 pub type Sem = Index<SemSentinel>;
-pub type Semantic = KeyVec<SemSentinel, SemData>;
 
 pub const ROOT_SEM: Sem = Sem::from_u32_index(0);
+
+pub type SemKinds = KeyVec<SemSentinel, SemKind>;
+pub type SemTypes = KeyVec<SemSentinel, Type>;
+
+pub struct Semantic {
+    pub kinds: SemKinds,
+    pub types: SemTypes,
+}
+
+impl Semantic {
+    pub fn push(&mut self, kind: SemKind, ty: Type) -> Sem {
+        debug_assert_eq!(self.kinds.entries().count(), self.types.entries().count());
+        self.kinds.push(kind);
+        self.types.push(ty)
+    }
+}

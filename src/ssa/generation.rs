@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     key_vec::{Sentinel, Val},
-    semantic::{self, Sem, SemData, SemKind, Semantic, TypeData, TypeSentinel, Types},
+    semantic::{self, Sem, SemKind, Semantic, TypeData, TypeSentinel, Types},
     token::{self, TokenOffsets},
 };
 
@@ -37,11 +37,7 @@ struct Generator<'a> {
 
 impl Generator<'_> {
     fn generate_module(&mut self) {
-        let SemData {
-            kind: SemKind::Module { bindings },
-            ..
-        } = &self.semantic[semantic::ROOT_SEM]
-        else {
+        let SemKind::Module { bindings } = &self.semantic.kinds[semantic::ROOT_SEM] else {
             panic!();
         };
 
@@ -81,18 +77,14 @@ impl Generator<'_> {
         }
 
         for (name, value) in bindings {
-            let SemData {
-                kind: SemKind::Function { .. },
-                ty,
-            } = &self.semantic[*value]
-            else {
-                panic!();
+            let SemKind::Function { .. } = self.semantic.kinds[*value] else {
+                panic!()
             };
 
             let Val::Value(TypeData::Function {
                 argument_type,
                 return_type,
-            }) = self.types.get(*ty)
+            }) = self.types.get(self.semantic.types[*value])
             else {
                 panic!()
             };
@@ -105,11 +97,7 @@ impl Generator<'_> {
         }
 
         for (name, value) in bindings {
-            let SemData {
-                kind: SemKind::Function { argument, body },
-                ..
-            } = &self.semantic[*value]
-            else {
+            let SemKind::Function { argument, body } = &self.semantic.kinds[*value] else {
                 panic!();
             };
 
@@ -128,7 +116,7 @@ impl Generator<'_> {
         bindings: &HashMap<String, Expr>,
         functions: &HashMap<String, Block>,
     ) -> Expr {
-        match &self.semantic[sem].kind {
+        match &self.semantic.kinds[sem] {
             SemKind::Number(token) => {
                 let value = token::parse_u64(self.source, &self.tokens, *token) as u32;
                 Expr::Const(self.ssa.const_u32(value))
@@ -146,7 +134,7 @@ impl Generator<'_> {
             }
             SemKind::Reference { name } => bindings[name],
             SemKind::Access { field, expr } => {
-                let field_index = match self.types.get(self.semantic[*expr].ty) {
+                let field_index = match self.types.get(self.semantic.types[*expr]) {
                     Val::Value(TypeData::Product { fields }) => {
                         fields.iter().position(|(name, _)| field == name).unwrap()
                     }
@@ -160,11 +148,7 @@ impl Generator<'_> {
             SemKind::Application { function, argument } => {
                 let argument = self.generate_expression(block, *argument, bindings, functions);
 
-                let SemData {
-                    kind: SemKind::Reference { name },
-                    ..
-                } = &self.semantic[*function]
-                else {
+                let SemKind::Reference { name } = &self.semantic.kinds[*function] else {
                     panic!();
                 };
 
@@ -225,7 +209,7 @@ impl Generator<'_> {
                 let else_expr =
                     self.generate_expression(&mut else_block, *else_, bindings, functions);
 
-                let after_block = self.ssa.basic_block(self.semantic[*then].ty);
+                let after_block = self.ssa.basic_block(self.semantic.types[*then]);
                 self.ssa.inst_jump(then_block, after_block, then_expr);
                 self.ssa.inst_jump(else_block, after_block, else_expr);
 
