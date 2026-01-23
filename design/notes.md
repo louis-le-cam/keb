@@ -83,3 +83,68 @@ multiple generics are inferred?
 
 It would be preferable for the order and constraints to be evident to a user of
 the function without using analysis tools such as a language server.
+
+## Solutions
+
+### Approach #1
+
+We could require the writer of the function to specify the type parameters with
+a syntax saying it infer their constraints, and the name of the type parameter
+correspond to the name of the variable (which would require a syntax with a
+symbol prefix like `'ident`).
+
+```awk
+let identity['x: infer] = x => x;
+let add['x: infer, 'y: infer] = (x, y) => x + y;
+```
+
+### Approach #2
+
+Or we could make type parameter named such that the caller would specify the
+type parameter name corresponding to the parameter.
+
+```awk
+let identity = x => x;
+let add = (x, y) => x + y;
+
+identity['x: u32]
+add['x: u32, 'y: u32]
+```
+
+### Thoughts
+
+There is also the problem of type parameter not directly related to exactly one
+type parameter.
+
+In the approach #1, we could just require the minimal number of type parameter
+parameter sufficient to correctly type the function:
+
+```awk
+let either['x] = (x, y) => if random() then x else y;
+# 'return = 'x 
+# 'y = 'return
+
+# We could also specify
+let either['y] = (x, y) => if random() then x else y;
+# Or (necessiting `'return` to be a special type parameter)
+let either['return] = (x, y) => if random() then x else y;
+```
+
+In the approach #2, we could let the user of the function use wathever number of
+typed generics necessary for a well typed function.
+
+```awk
+let either = (x, y) => if random() then x else y;
+
+# All of these are correct and equivalent:
+either['x: u32]
+either['y: u32]
+either['return: u32]
+# If we want to go all in
+either['x: u32, 'y: u32, 'return: u32]
+```
+
+The advantage of this method might be that in some case the user can specify the
+type parameters in a way that is simpler to it.
+It would even more ressemble a way of constraining the type of a function
+instead of really specifying type parameters.
