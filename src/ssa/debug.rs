@@ -48,11 +48,11 @@ pub fn debug(types: &Types, ssa: &Ssa) {
             print!("  {} = ", format!("%{}", inst.as_u32()).bright_green());
 
             match &ssa.insts[*inst] {
-                InstData::Field(expr, field) => {
-                    print!("{} ", "field".bright_red().bold());
-                    debug_expr(expr);
-                    print!(", {field}");
-                }
+                InstData::Field(expr, field) => print!(
+                    "{} {}, {field}",
+                    "field".bright_red().bold(),
+                    debug_expr(expr),
+                ),
                 InstData::Record(fields, _) => {
                     print!("{} ", "record".bright_red().bold());
                     for (i, field) in fields.iter().enumerate() {
@@ -60,71 +60,60 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                             print!(", ");
                         }
 
-                        debug_expr(field);
+                        print!("{}", debug_expr(field));
                     }
                 }
-                InstData::Add(lhs, rhs) => {
-                    print!("{} ", "add".bright_red().bold());
-                    debug_expr(lhs);
-                    print!(", ");
-                    debug_expr(rhs);
-                }
-                InstData::Sub(lhs, rhs) => {
-                    print!("{} ", "sub".bright_red().bold());
-                    debug_expr(lhs);
-                    print!(", ");
-                    debug_expr(rhs);
-                }
-                InstData::Mul(lhs, rhs) => {
-                    print!("{} ", "mul".bright_red().bold());
-                    debug_expr(lhs);
-                    print!(", ");
-                    debug_expr(rhs);
-                }
-                InstData::Div(lhs, rhs) => {
-                    print!("{} ", "div".bright_red().bold());
-                    debug_expr(lhs);
-                    print!(", ");
-                    debug_expr(rhs);
-                }
-                InstData::Call { function, argument } => {
-                    print!(
-                        "{} {}, ",
-                        "call".bright_red().bold(),
-                        format!("@{}", function.as_u32()).bright_yellow()
-                    );
-                    debug_expr(argument);
-                }
-                InstData::Jump { block, argument } => {
-                    print!(
-                        "{} {}",
-                        "jump".bright_red().bold(),
-                        format!("@{}", block.as_u32()).bright_yellow()
-                    );
-                    print!(", ");
-                    debug_expr(argument);
-                }
+                InstData::Add(lhs, rhs) => print!(
+                    "{} {}, {}",
+                    "add".bright_red().bold(),
+                    debug_expr(lhs),
+                    debug_expr(rhs),
+                ),
+                InstData::Sub(lhs, rhs) => print!(
+                    "{} {}, {}",
+                    "sub".bright_red().bold(),
+                    debug_expr(lhs),
+                    debug_expr(rhs),
+                ),
+                InstData::Mul(lhs, rhs) => print!(
+                    "{} {}, {}",
+                    "mul".bright_red().bold(),
+                    debug_expr(lhs),
+                    debug_expr(rhs),
+                ),
+                InstData::Div(lhs, rhs) => print!(
+                    "{} {}, {}",
+                    "div".bright_red().bold(),
+                    debug_expr(lhs),
+                    debug_expr(rhs),
+                ),
+                InstData::Call { function, argument } => print!(
+                    "{} {}, {}",
+                    "call".bright_red().bold(),
+                    format!("@{}", function.as_u32()).bright_yellow(),
+                    debug_expr(argument),
+                ),
+                InstData::Jump { block, argument } => print!(
+                    "{} {}, {}",
+                    "jump".bright_red().bold(),
+                    format!("@{}", block.as_u32()).bright_yellow(),
+                    debug_expr(argument),
+                ),
                 InstData::JumpCondition {
                     condition,
                     then,
                     else_,
-                } => {
-                    print!(
-                        "{} {} {} ",
-                        "jump".bright_red().bold(),
-                        format!("@{}", then.as_u32()).bright_yellow(),
-                        "if".bright_red(),
-                    );
-                    debug_expr(condition);
-                    print!(
-                        " {} {}",
-                        "else".bright_red(),
-                        format!("@{}", else_.as_u32()).bright_yellow()
-                    );
-                }
+                } => print!(
+                    "{} {} {} {} {} {}",
+                    "jump".bright_red().bold(),
+                    format!("@{}", then.as_u32()).bright_yellow(),
+                    "if".bright_red(),
+                    debug_expr(condition),
+                    "else".bright_red(),
+                    format!("@{}", else_.as_u32()).bright_yellow(),
+                ),
                 InstData::Return(value) => {
-                    print!("{} ", "return".bright_red().bold());
-                    debug_expr(value);
+                    print!("{} {}", "return".bright_red().bold(), debug_expr(value))
                 }
             }
             println!("{}", ";".white());
@@ -153,7 +142,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
     }
 }
 
-fn debug_expr(expr: &Expr) {
+fn debug_expr(expr: &Expr) -> String {
     match expr {
         Expr::Const(const_) => {
             let text = match const_.sentinel() {
@@ -165,11 +154,11 @@ fn debug_expr(expr: &Expr) {
                 None => &format!("${}", const_.as_u32()).to_string(),
             };
 
-            print!("{}", format!("{text}").bright_magenta())
+            text.bright_magenta().to_string()
         }
-        Expr::Inst(inst) => print!("{}", format!("%{}", inst.as_u32()).bright_green()),
-        Expr::BlockArg(block) => {
-            print!("{}", format!("param(@{})", block.as_u32()).bright_yellow())
-        }
+        Expr::Inst(inst) => format!("%{}", inst.as_u32()).bright_green().to_string(),
+        Expr::BlockArg(block) => format!("param(@{})", block.as_u32())
+            .bright_yellow()
+            .to_string(),
     }
 }
