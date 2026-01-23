@@ -1,161 +1,10 @@
 use std::fmt::Debug;
 
-use colored::Colorize;
+use colored::{ColoredString, Colorize};
 
 use crate::syntax::{ROOT_SYN, StringSegment, Syn, SynData, Syntax};
 
 pub fn debug(syntax: &Syntax) {
-    struct DebugSyn<'a> {
-        syntax: &'a Syntax,
-        syn: Syn,
-    }
-
-    impl Debug for DebugSyn<'_> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let dbg_syn = |syn| {
-                DebugWrapper(DebugSyn {
-                    syntax: self.syntax,
-                    syn,
-                })
-            };
-
-            match &self.syntax[self.syn] {
-                SynData::Root(syns) => syns
-                    .iter()
-                    .fold(
-                        &mut f.debug_tuple(&"root".bright_green().to_string()),
-                        |tuple, expr| tuple.field(&dbg_syn(*expr)),
-                    )
-                    .finish(),
-                SynData::Ident { .. } => f.debug_tuple(&"ident".bright_cyan().to_string()).finish(),
-                SynData::False { .. } => {
-                    f.debug_tuple(&"false".bright_purple().to_string()).finish()
-                }
-                SynData::True { .. } => f.debug_tuple(&"true".bright_purple().to_string()).finish(),
-                SynData::Number { .. } => f
-                    .debug_tuple(&"number".bright_purple().to_string())
-                    .finish(),
-                SynData::Add(lhs, rhs) => f
-                    .debug_tuple(&"add".bright_yellow().to_string())
-                    .field(&dbg_syn(*lhs))
-                    .field(&dbg_syn(*rhs))
-                    .finish(),
-                SynData::Subtract(lhs, rhs) => f
-                    .debug_tuple(&"subtract".bright_yellow().to_string())
-                    .field(&dbg_syn(*lhs))
-                    .field(&dbg_syn(*rhs))
-                    .finish(),
-                SynData::Multiply(lhs, rhs) => f
-                    .debug_tuple(&"multiply".bright_yellow().to_string())
-                    .field(&dbg_syn(*lhs))
-                    .field(&dbg_syn(*rhs))
-                    .finish(),
-                SynData::Divide(lhs, rhs) => f
-                    .debug_tuple(&"divide".bright_yellow().to_string())
-                    .field(&dbg_syn(*lhs))
-                    .field(&dbg_syn(*rhs))
-                    .finish(),
-                SynData::Binding { pattern, value } => f
-                    .debug_tuple(&"let".bright_red().to_string())
-                    .field(&dbg_syn(*pattern))
-                    .field(&dbg_syn(*value))
-                    .finish(),
-                SynData::Function { pattern, body } => f
-                    .debug_tuple(&"function".bright_green().to_string())
-                    .field(&dbg_syn(*pattern))
-                    .field(&dbg_syn(*body))
-                    .finish(),
-                SynData::ReturnAscription {
-                    syn: pattern,
-                    type_,
-                } => f
-                    .debug_tuple(&"return_ascription".white().to_string())
-                    .field(&dbg_syn(*pattern))
-                    .field(&dbg_syn(*type_))
-                    .finish(),
-                SynData::Ascription { syn, type_ } => f
-                    .debug_tuple(&"ascription".white().to_string())
-                    .field(&dbg_syn(*syn))
-                    .field(&dbg_syn(*type_))
-                    .finish(),
-                SynData::Access { syn, key } => f
-                    .debug_tuple(&"access".white().to_string())
-                    .field(&dbg_syn(*syn))
-                    .field(&dbg_syn(*key))
-                    .finish(),
-                SynData::EmptyParen { .. } => {
-                    f.debug_tuple(&"empty_paren".white().to_string()).finish()
-                }
-                SynData::Paren(expr) => f
-                    .debug_tuple(&"paren".white().to_string())
-                    .field(&dbg_syn(*expr))
-                    .finish(),
-                SynData::EmptyCurly { .. } => {
-                    f.debug_tuple(&"empty_curly".white().to_string()).finish()
-                }
-                SynData::Curly(expr) => f
-                    .debug_tuple(&"curly".white().to_string())
-                    .field(&dbg_syn(*expr))
-                    .finish(),
-                SynData::Tuple(syns) => syns
-                    .iter()
-                    .fold(
-                        &mut f.debug_tuple(&"tuple".white().to_string()),
-                        |tuple, expr| tuple.field(&dbg_syn(*expr)),
-                    )
-                    .finish(),
-                SynData::Application { function, argument } => f
-                    .debug_tuple(&"application".bright_green().to_string())
-                    .field(&dbg_syn(*function))
-                    .field(&dbg_syn(*argument))
-                    .finish(),
-                SynData::Loop(body) => f
-                    .debug_tuple(&"loop".bright_red().to_string())
-                    .field(&dbg_syn(*body))
-                    .finish(),
-                SynData::If { condition, then } => f
-                    .debug_tuple(&"if".bright_red().to_string())
-                    .field(&dbg_syn(*condition))
-                    .field(&dbg_syn(*then))
-                    .finish(),
-                SynData::IfElse {
-                    condition,
-                    then,
-                    else_,
-                } => f
-                    .debug_tuple(&"if_else".bright_red().to_string())
-                    .field(&dbg_syn(*condition))
-                    .field(&dbg_syn(*then))
-                    .field(&dbg_syn(*else_))
-                    .finish(),
-                SynData::ChainOpen(syns) => syns
-                    .iter()
-                    .fold(
-                        &mut f.debug_tuple(&"chain_open".white().to_string()),
-                        |tuple, expr| tuple.field(&dbg_syn(*expr)),
-                    )
-                    .finish(),
-                SynData::ChainClosed(syns) => syns
-                    .iter()
-                    .fold(
-                        &mut f.debug_tuple(&"chain_closed".white().to_string()),
-                        |tuple, expr| tuple.field(&dbg_syn(*expr)),
-                    )
-                    .finish(),
-                SynData::String(segments) => segments
-                    .iter()
-                    .fold(
-                        &mut f.debug_tuple(&"chain_closed".white().to_string()),
-                        |tuple, segment| match segment {
-                            StringSegment::Token(token) => tuple.field(&token),
-                            StringSegment::Interpolation(syn) => tuple.field(&dbg_syn(*syn)),
-                        },
-                    )
-                    .finish(),
-            }
-        }
-    }
-
     println!(
         "{:#?}",
         DebugSyn {
@@ -171,11 +20,83 @@ impl<T: Debug> Debug for DebugWrapper<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let oneline_format = format!("{:?}", self.0);
         // NOTE: The `len` includes control character for color so
-        // it's more than innacurate, but it does the job
+        // it's more than innacurate, but it does the job.
+        // We also don't take into account the current indentation.
         if oneline_format.len() <= 50 {
             return f.write_str(&oneline_format);
         }
 
         self.0.fmt(f)
+    }
+}
+
+struct DebugSyn<'a> {
+    syntax: &'a Syntax,
+    syn: Syn,
+}
+
+impl Debug for DebugSyn<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let debug_syn = |syn| {
+            DebugWrapper(DebugSyn {
+                syntax: self.syntax,
+                syn,
+            })
+        };
+
+        let (name, fields): (ColoredString, &[Syn]) = match &self.syntax[self.syn] {
+            SynData::Root(syns) => ("root".bright_green(), syns.as_slice()),
+            SynData::Ident(_) => ("ident".bright_cyan(), &[]),
+            SynData::False(_) => ("false".bright_purple(), &[]),
+            SynData::True(_) => ("true".bright_purple(), &[]),
+            SynData::Number(_) => ("number".bright_purple(), &[]),
+            SynData::Add(lhs, rhs) => ("add".bright_yellow(), &[*lhs, *rhs]),
+            SynData::Subtract(lhs, rhs) => ("sub".bright_yellow(), &[*lhs, *rhs]),
+            SynData::Multiply(lhs, rhs) => ("mul".bright_yellow(), &[*lhs, *rhs]),
+            SynData::Divide(lhs, rhs) => ("div".bright_yellow(), &[*lhs, *rhs]),
+            SynData::Binding { pattern, value } => ("let".bright_red(), &[*pattern, *value]),
+            SynData::Function { pattern, body } => ("function".bright_green(), &[*pattern, *body]),
+            SynData::ReturnAscription { syn, type_ } => {
+                ("return_ascription".white(), &[*syn, *type_])
+            }
+            SynData::Ascription { syn, type_ } => ("ascription".white(), &[*syn, *type_]),
+            SynData::Access { syn, key } => ("access".white(), &[*syn, *key]),
+            SynData::EmptyParen(_) => ("empty_paren".white(), &[]),
+            SynData::Paren(expr) => ("paren".white(), &[*expr]),
+            SynData::EmptyCurly(_) => ("empty_curly".white(), &[]),
+            SynData::Curly(expr) => ("curly".white(), &[*expr]),
+            SynData::Tuple(syns) => ("tuple".white(), syns.as_slice()),
+            SynData::Application { function, argument } => {
+                ("application".bright_green(), &[*function, *argument])
+            }
+            SynData::Loop(body) => ("loop".bright_red(), &[*body]),
+            SynData::If { condition, then } => ("if".bright_red(), &[*condition, *then]),
+            SynData::IfElse {
+                condition,
+                then,
+                else_,
+            } => ("if_else".bright_red(), &[*condition, *then, *else_]),
+            SynData::ChainOpen(syns) => ("chain_open".white(), syns.as_slice()),
+            SynData::ChainClosed(syns) => ("chain_closed".white(), syns.as_slice()),
+            SynData::String(segments) => {
+                return segments
+                    .iter()
+                    .fold(
+                        &mut f.debug_tuple(&"chain_closed".white().to_string()),
+                        |tuple, segment| match segment {
+                            StringSegment::Token(token) => tuple.field(&token),
+                            StringSegment::Interpolation(syn) => tuple.field(&debug_syn(*syn)),
+                        },
+                    )
+                    .finish();
+            }
+        };
+
+        fields
+            .iter()
+            .fold(&mut f.debug_tuple(&name.to_string()), |tuple, field| {
+                tuple.field(&debug_syn(*field))
+            })
+            .finish()
     }
 }
