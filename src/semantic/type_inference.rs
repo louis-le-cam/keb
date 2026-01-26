@@ -156,6 +156,28 @@ impl Inferrer<'_> {
 
                 self.add_type(i, body_type);
             }
+            SemKind::Assignment { binding, value } => {
+                let value = *value;
+
+                match scope[binding] {
+                    ScopeItem::Sem(sem) => self.add_type(value, self.semantic.types[sem]),
+                    ScopeItem::Argument(sem) => {
+                        match self.types.get(self.semantic.types[sem]) {
+                            Val::None => panic!(),
+                            Val::Value(TypeData::Function {
+                                argument_type,
+                                return_type: _,
+                            }) => self.add_type(value, *argument_type),
+                            Val::Sentinel(_) | Val::Value(_) => {}
+                        }
+
+                        todo!()
+                    }
+                    ScopeItem::Type(_) => panic!(),
+                };
+
+                self.infer_expression(scope, value);
+            }
             SemKind::Reference { name } => {
                 let type_ = match scope[name] {
                     ScopeItem::Sem(sem) => self.semantic.types[sem],

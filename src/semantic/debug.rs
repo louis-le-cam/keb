@@ -75,6 +75,10 @@ impl Debug for DebugSem<'_> {
                     &sem(*body),
                 ],
             ),
+            SemKind::Assignment { binding, value } => display(
+                "assignment",
+                &[&DebugUsingDisplay(binding.bright_cyan()), &sem(*value)],
+            ),
             SemKind::Reference { name } => f.write_str(&format!(
                 "{}({})",
                 "reference".bright_green(),

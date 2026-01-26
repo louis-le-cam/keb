@@ -262,12 +262,21 @@ impl Generator<'_> {
                     BlockData::Block { .. } => panic!(),
                 },
                 InstData::Jump { block, argument } => {
-                    body.push_str(&format!(
-                        "a{} = {};\n    goto b{}",
-                        block.as_u32(),
-                        self.generate_expr(*argument),
-                        block.as_u32(),
-                    ));
+                    let argument_type = match &self.ssa.blocks[*block] {
+                        BlockData::ExternFunction { arg, .. }
+                        | BlockData::Function { arg, .. }
+                        | BlockData::Block { arg, .. } => arg,
+                    };
+
+                    if !matches!(argument_type.sentinel(), Some(TypeSentinel::Unit)) {
+                        body.push_str(&format!(
+                            "a{} = {};\n    ",
+                            block.as_u32(),
+                            self.generate_expr(*argument),
+                        ));
+                    }
+
+                    body.push_str(&format!("goto b{}", block.as_u32(),));
                 }
                 InstData::JumpCondition {
                     condition,

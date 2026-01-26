@@ -5,7 +5,7 @@ use crate::{
         combine_types,
     },
     syntax::{self, Syn, SynData, Syntax},
-    token::{self, TokenOffsets},
+    token::{self, TokenOffsets, parse_identifer},
 };
 
 pub fn parse(source: &str, tokens: &TokenOffsets, syntax: &Syntax) -> (Semantic, Types) {
@@ -128,6 +128,16 @@ impl Parser<'_> {
             SynData::Subtract(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_sub"),
             SynData::Multiply(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_mul"),
             SynData::Divide(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_div"),
+            SynData::Assignment { pattern, value } => {
+                let value = self.parse_expression(*value);
+                match self.syntax[*pattern] {
+                    SynData::Ident(token) => self.push(SemKind::Assignment {
+                        binding: parse_identifer(self.source, self.tokens, token).to_string(),
+                        value,
+                    }),
+                    _ => panic!(),
+                }
+            }
             SynData::Application { function, argument } => {
                 let function = self.parse_expression(*function);
                 let argument = self.parse_expression(*argument);
@@ -243,6 +253,18 @@ impl Parser<'_> {
                 }),
                 TypeSentinel::Unknown.to_index(),
             ),
+            SynData::Mut { pattern } => {
+                let SynData::Ident(token) = self.syntax[*pattern] else {
+                    panic!()
+                };
+
+                let name = token::parse_identifer(self.source, self.tokens, token).to_string();
+
+                (
+                    self.push(SemKind::MutBinding { name, value, body }),
+                    TypeSentinel::Unknown.to_index(),
+                )
+            }
             SynData::EmptyParen(_) => (body, TypeSentinel::Unit.to_index()),
             SynData::Paren(expr) => self.sift_through_pattern(value, *expr, body),
             SynData::Ascription {

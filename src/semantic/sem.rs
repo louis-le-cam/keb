@@ -26,6 +26,10 @@ pub enum SemKind {
         value: Sem,
         body: Sem,
     },
+    Assignment {
+        binding: String,
+        value: Sem,
+    },
     Reference {
         name: String,
     },

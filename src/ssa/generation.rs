@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     key_vec::{Sentinel, Val},
@@ -102,20 +102,19 @@ impl Generator<'_> {
             };
 
             let mut block = functions[name.as_str()];
-            let bindings = HashMap::from([(argument.clone(), Expr::BlockArg(block))]);
+            let mut scope = Scope {
+                parent: None,
+                mutable_bindings: HashSet::new(),
+                bindings: HashMap::from([(argument.clone(), Expr::BlockArg(block))]),
+                functions: functions.clone(),
+            };
 
-            let expr = self.generate_expression(&mut block, *body, &bindings, &functions);
+            let expr = self.generate_expression(&mut block, *body, &mut scope);
             self.ssa.inst_return(block, expr);
         }
     }
 
-    pub fn generate_expression(
-        &mut self,
-        block: &mut Block,
-        sem: Sem,
-        bindings: &HashMap<String, Expr>,
-        functions: &HashMap<String, Block>,
-    ) -> Expr {
+    pub fn generate_expression(&mut self, block: &mut Block, sem: Sem, scope: &mut Scope) -> Expr {
         match &self.semantic.kinds[sem] {
             SemKind::Number(token) => {
                 let value = token::parse_u64(self.source, &self.tokens, *token) as u32;
@@ -126,13 +125,34 @@ impl Generator<'_> {
             SemKind::Module { .. } => todo!(),
             SemKind::Function { .. } => todo!(),
             SemKind::Binding { name, value, body } | SemKind::MutBinding { name, value, body } => {
-                let value = self.generate_expression(block, *value, bindings, functions);
-                let mut bindings = bindings.clone();
-                bindings.insert(name.to_string(), value);
+                let value = self.generate_expression(block, *value, scope);
 
-                self.generate_expression(block, *body, &bindings, functions)
+                let mutable_bindings = if let SemKind::MutBinding { .. } = self.semantic.kinds[sem]
+                {
+                    HashSet::from([name.to_string()])
+                } else {
+                    HashSet::new()
+                };
+
+                let mut scope = Scope {
+                    parent: Some(scope),
+                    mutable_bindings,
+                    bindings: HashMap::from([(name.to_string(), value)]),
+                    functions: HashMap::new(),
+                };
+
+                self.generate_expression(block, *body, &mut scope)
             }
-            SemKind::Reference { name } => bindings[name],
+            SemKind::Assignment { binding, value } => {
+                // TODO: Does not work with branching, it will take the value
+                // from the last branch because we just replace the binding.
+                // Should we use block arguments?
+                assert!(scope.is_mutable(binding));
+                let value = self.generate_expression(block, *value, scope);
+                scope.bindings.insert(binding.clone(), value).unwrap();
+                Expr::Const(ConstSentinel::Unit.to_index())
+            }
+            SemKind::Reference { name } => scope.binding(name).unwrap(),
             SemKind::Access { field, expr } => {
                 let field_index = match self.types.get(self.semantic.types[*expr]) {
                     Val::Value(TypeData::Product { fields }) => {
@@ -141,18 +161,21 @@ impl Generator<'_> {
                     Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
                 };
 
-                let expr = self.generate_expression(block, *expr, bindings, functions);
+                let expr = self.generate_expression(block, *expr, scope);
 
                 Expr::Inst(self.ssa.inst_field(*block, expr, field_index as u32))
             }
             SemKind::Application { function, argument } => {
-                let argument = self.generate_expression(block, *argument, bindings, functions);
+                let argument = self.generate_expression(block, *argument, scope);
 
                 let SemKind::Reference { name } = &self.semantic.kinds[*function] else {
                     panic!();
                 };
 
-                Expr::Inst(self.ssa.inst_call(*block, functions[name], argument))
+                Expr::Inst(
+                    self.ssa
+                        .inst_call(*block, scope.function(name).unwrap(), argument),
+                )
             }
             SemKind::Loop(body) => {
                 let loop_block = self.ssa.basic_block(TypeSentinel::Unit.to_index());
@@ -163,14 +186,14 @@ impl Generator<'_> {
                 );
                 *block = loop_block;
 
-                self.generate_expression(block, *body, bindings, functions);
+                self.generate_expression(block, *body, scope);
 
                 self.ssa
                     .inst_jump(*block, *block, Expr::Const(ConstSentinel::Unit.to_index()));
                 Expr::Const(ConstSentinel::Unit.to_index())
             }
             SemKind::If { condition, then } => {
-                let condition = self.generate_expression(block, *condition, bindings, functions);
+                let condition = self.generate_expression(block, *condition, scope);
 
                 let mut then_block = self.ssa.basic_block(TypeSentinel::Unit.to_index());
                 let after_block = self.ssa.basic_block(TypeSentinel::Unit.to_index());
@@ -178,7 +201,7 @@ impl Generator<'_> {
                 self.ssa
                     .inst_jump_condition(*block, condition, then_block, after_block);
 
-                self.generate_expression(&mut then_block, *then, bindings, functions);
+                self.generate_expression(&mut then_block, *then, scope);
 
                 self.ssa.inst_jump(
                     then_block,
@@ -195,7 +218,7 @@ impl Generator<'_> {
                 then,
                 else_,
             } => {
-                let condition = self.generate_expression(block, *condition, bindings, functions);
+                let condition = self.generate_expression(block, *condition, scope);
 
                 let mut then_block = self.ssa.basic_block(TypeSentinel::Unit.to_index());
                 let mut else_block = self.ssa.basic_block(TypeSentinel::Unit.to_index());
@@ -203,11 +226,9 @@ impl Generator<'_> {
                 self.ssa
                     .inst_jump_condition(*block, condition, then_block, else_block);
 
-                let then_expr =
-                    self.generate_expression(&mut then_block, *then, bindings, functions);
+                let then_expr = self.generate_expression(&mut then_block, *then, scope);
 
-                let else_expr =
-                    self.generate_expression(&mut else_block, *else_, bindings, functions);
+                let else_expr = self.generate_expression(&mut else_block, *else_, scope);
 
                 let after_block = self.ssa.basic_block(self.semantic.types[*then]);
                 self.ssa.inst_jump(then_block, after_block, then_expr);
@@ -220,7 +241,7 @@ impl Generator<'_> {
             SemKind::BuildStruct { fields } => {
                 let fields = fields
                     .iter()
-                    .map(|(_, value)| self.generate_expression(block, *value, bindings, functions))
+                    .map(|(_, value)| self.generate_expression(block, *value, scope))
                     .collect();
 
                 Expr::Inst(self.ssa.inst_product(self.types, *block, fields))
@@ -230,18 +251,49 @@ impl Generator<'_> {
                 expression,
             } => {
                 for statement in statements {
-                    self.generate_expression(block, *statement, bindings, functions);
+                    self.generate_expression(block, *statement, scope);
                 }
 
-                self.generate_expression(block, *expression, bindings, functions)
+                self.generate_expression(block, *expression, scope)
             }
             SemKind::ChainClosed { statements } => {
                 for statement in statements {
-                    self.generate_expression(block, *statement, bindings, functions);
+                    self.generate_expression(block, *statement, scope);
                 }
 
                 Expr::Const(ConstSentinel::Unit.to_index())
             }
         }
+    }
+}
+
+struct Scope<'a> {
+    parent: Option<&'a Scope<'a>>,
+    mutable_bindings: HashSet<String>,
+    bindings: HashMap<String, Expr>,
+    functions: HashMap<String, Block>,
+}
+
+impl Scope<'_> {
+    fn is_mutable(&self, name: &str) -> bool {
+        self.mutable_bindings.contains(name)
+            || self
+                .parent
+                .map(|parent| parent.is_mutable(name))
+                .unwrap_or(false)
+    }
+
+    fn binding(&self, name: &str) -> Option<Expr> {
+        self.bindings
+            .get(name)
+            .copied()
+            .or_else(|| self.parent.and_then(|parent| parent.binding(name)))
+    }
+
+    fn function(&self, name: &str) -> Option<Block> {
+        self.functions
+            .get(name)
+            .copied()
+            .or_else(|| self.parent.and_then(|parent| parent.function(name)))
     }
 }
