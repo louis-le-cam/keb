@@ -43,7 +43,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
     }
 
     fn parse_chain(&mut self) -> Option<Syn> {
-        let syn = self.parse_tuple()?;
+        let syn = self.parse_assignment()?;
 
         let Some((_, TokenKind::Semicolon)) = self.tokens.peek() else {
             return Some(syn);
@@ -54,7 +54,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         let mut syns = vec![syn];
 
         let closed = loop {
-            match self.parse_tuple() {
+            match self.parse_assignment() {
                 Some(syn) => syns.push(syn),
                 None => break true,
             };
@@ -70,6 +70,20 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         } else {
             SynData::ChainOpen(syns)
         }))
+    }
+
+    fn parse_assignment(&mut self) -> Option<Syn> {
+        let pattern = self.parse_tuple()?;
+
+        let Some((_, TokenKind::Equal)) = self.tokens.peek() else {
+            return Some(pattern);
+        };
+
+        self.tokens.next();
+
+        let value = self.parse_tuple()?;
+
+        Some(self.syntax.push(SynData::Assignment { pattern, value }))
     }
 
     fn parse_tuple(&mut self) -> Option<Syn> {
@@ -218,11 +232,8 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             }
             TokenKind::Let => self.parse_let(),
             TokenKind::Mut => {
-                dbg!(1);
                 self.tokens.next();
-                let pattern = self.parse_chain().unwrap();
-                dbg!(&self.syntax[pattern]);
-                dbg!(self.tokens.peek());
+                let pattern = self.parse_return_ascription().unwrap();
                 self.syntax.push(SynData::Mut { pattern })
             }
             TokenKind::Loop => {
@@ -304,7 +315,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             panic!()
         };
 
-        let pattern = self.parse_chain().unwrap();
+        let pattern = self.parse_tuple().unwrap();
 
         let Some((_, TokenKind::Equal)) = self.tokens.next() else {
             panic!();
