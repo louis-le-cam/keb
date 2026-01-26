@@ -125,7 +125,7 @@ impl Generator<'_> {
             SemKind::True(_) => Expr::Const(ConstSentinel::True.to_index()),
             SemKind::Module { .. } => todo!(),
             SemKind::Function { .. } => todo!(),
-            SemKind::Binding { name, value, body } => {
+            SemKind::Binding { name, value, body } | SemKind::MutBinding { name, value, body } => {
                 let value = self.generate_expression(block, *value, bindings, functions);
                 let mut bindings = bindings.clone();
                 bindings.insert(name.to_string(), value);

@@ -1,7 +1,7 @@
 let add = (a: u32, b: u32) => a + b;
 
 let main = () => (
-    let a = false;
+    let mut a = false;
     let x = if a then 8 else 8 * 3;
     print x;
 );

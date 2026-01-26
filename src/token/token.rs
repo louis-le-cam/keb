@@ -24,6 +24,7 @@ pub enum TokenKind {
     Number,
     Ident,
     Let,
+    Mut,
     Loop,
     If,
     Then,

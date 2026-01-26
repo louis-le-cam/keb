@@ -44,6 +44,7 @@ pub fn debug(source: &str, tokens: &Tokens) {
                 .bright_purple(),
             TokenKind::Ident => parse_identifer(source, &tokens.offsets, token).bright_cyan(),
             TokenKind::Let => "let".bright_red(),
+            TokenKind::Mut => "mut".bright_red(),
             TokenKind::Loop => "loop".bright_red(),
             TokenKind::If => "if".bright_red(),
             TokenKind::Then => "then".bright_red(),

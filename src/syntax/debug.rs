@@ -55,6 +55,7 @@ impl Debug for DebugSyn<'_> {
             SynData::Multiply(lhs, rhs) => ("mul".bright_yellow(), &[*lhs, *rhs]),
             SynData::Divide(lhs, rhs) => ("div".bright_yellow(), &[*lhs, *rhs]),
             SynData::Binding { pattern, value } => ("let".bright_red(), &[*pattern, *value]),
+            SynData::Mut { pattern } => ("mut".bright_red(), &[*pattern]),
             SynData::Function { pattern, body } => ("function".bright_green(), &[*pattern, *body]),
             SynData::ReturnAscription { syn, type_ } => {
                 ("return_ascription".white(), &[*syn, *type_])

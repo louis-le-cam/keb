@@ -67,6 +67,14 @@ impl Debug for DebugSem<'_> {
                     &sem(*body),
                 ],
             ),
+            SemKind::MutBinding { name, value, body } => display(
+                "mut_binding",
+                &[
+                    &DebugUsingDisplay(name.bright_cyan()),
+                    &sem(*value),
+                    &sem(*body),
+                ],
+            ),
             SemKind::Reference { name } => f.write_str(&format!(
                 "{}({})",
                 "reference".bright_green(),

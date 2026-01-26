@@ -140,7 +140,7 @@ impl Inferrer<'_> {
                     self.add_type(i, type_);
                 }
             }
-            SemKind::Binding { name, value, body } => {
+            SemKind::Binding { name, value, body } | SemKind::MutBinding { name, value, body } => {
                 let name = name.clone();
                 let value = *value;
                 let body = *body;

@@ -17,9 +17,14 @@ pub enum SynData {
     Subtract(Syn, Syn),
     Multiply(Syn, Syn),
     Divide(Syn, Syn),
+    // TODO: Maybe binding should only hold one syn that can be either a
+    // pattern, or an assignement
     Binding {
         pattern: Syn,
         value: Syn,
+    },
+    Mut {
+        pattern: Syn,
     },
     Function {
         pattern: Syn,

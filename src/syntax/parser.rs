@@ -217,6 +217,14 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 self.syntax.push(SynData::Ident(token))
             }
             TokenKind::Let => self.parse_let(),
+            TokenKind::Mut => {
+                dbg!(1);
+                self.tokens.next();
+                let pattern = self.parse_chain().unwrap();
+                dbg!(&self.syntax[pattern]);
+                dbg!(self.tokens.peek());
+                self.syntax.push(SynData::Mut { pattern })
+            }
             TokenKind::Loop => {
                 self.tokens.next();
                 let body = self.parse_application().unwrap();

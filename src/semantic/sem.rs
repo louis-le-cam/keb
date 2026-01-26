@@ -21,6 +21,11 @@ pub enum SemKind {
         value: Sem,
         body: Sem,
     },
+    MutBinding {
+        name: String,
+        value: Sem,
+        body: Sem,
+    },
     Reference {
         name: String,
     },
