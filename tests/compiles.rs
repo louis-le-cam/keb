@@ -68,7 +68,7 @@ fn if_then_else_expression() {
 #[test]
 fn factorial_recursive_if_then_else() {
     let source = r#"
-        let fact = (x: u32) => if x then (x * (fact (x - 1))) else 1;
+        let fact = (x: u32) => if x then x * (fact x - 1) else 1;
         let main = () => print fact 8
     "#;
 
