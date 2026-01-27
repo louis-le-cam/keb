@@ -164,17 +164,10 @@ impl Generator<'_> {
 
         let mut blocks = HashSet::new();
 
-        for inst in insts {
-            match &self.ssa.insts[*inst] {
-                InstData::Jump { block, .. } => {
-                    blocks.insert(*block);
-                }
-                InstData::JumpCondition { then, else_, .. } => {
-                    blocks.insert(*then);
-                    blocks.insert(*else_);
-                }
-                _ => {}
-            }
+        match &self.ssa.insts[*insts.last().unwrap()] {
+            InstData::Jump { block, .. } => blocks.extend([*block]),
+            InstData::JumpCondition { then, else_, .. } => blocks.extend([*then, *else_]),
+            _ => {}
         }
 
         let mut checked_blocks = HashSet::new();
@@ -186,17 +179,10 @@ impl Generator<'_> {
                 panic!();
             };
 
-            for inst in insts {
-                match &self.ssa.insts[*inst] {
-                    InstData::Jump { block, .. } => {
-                        blocks.insert(*block);
-                    }
-                    InstData::JumpCondition { then, else_, .. } => {
-                        blocks.insert(*then);
-                        blocks.insert(*else_);
-                    }
-                    _ => {}
-                }
+            match &self.ssa.insts[*insts.last().unwrap()] {
+                InstData::Jump { block, .. } => blocks.extend([*block]),
+                InstData::JumpCondition { then, else_, .. } => blocks.extend([*then, *else_]),
+                _ => {}
             }
         }
 
