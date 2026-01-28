@@ -1,6 +1,0 @@
-let fact = match {
-    0 => 1,
-    n => n * (fact n - 1),
-};
-
-let main = () => print fact 8;
