@@ -7,7 +7,7 @@ pub fn lex(source: &str) -> Tokens {
     let mut in_string = false;
 
     let tokens = std::iter::from_fn(move || {
-        loop {
+        'outer: loop {
             let (start, char) = chars.next()?;
 
             let token = match char {
@@ -39,34 +39,20 @@ pub fn lex(source: &str) -> Tokens {
                     TokenKind::StringStart
                 }
 
-                // TODO: allow multi-line comments (with `/**/`?)
-                // QUESTION: should we use `#` or `//` for single line comments
-                // - `#` is the unix standard, if we use it, we don't have to
-                //   care about shebangs, it is also concise
-                // - `//` is the c-like language standard, it will be more
-                //   familiar to most developpers (python uses `#` so it's at
-                //   least a BIG language using it)
-                //
-                // There is also the question of doc comments, if we use a
-                // distinct syntax like rust, the `///` is more established and
-                // something like `##` seems a bit weird.
-                //
-                // Also crate comments, `//!` in rust would look like shebang
-                // `#!` which is really not good since they crate comments
-                // usually start at the first line.
-                //
-                // There is also `--` as an honorable mention...
-                //
-                // `#` could also be used as attribute syntax `#[attr]` or
-                // `#attr`, which would conflict with the comment syntax.
-                '/' if chars.next_if(|(_, ch)| *ch == '/').is_some() => {
-                    while let Some(_) = chars.next_if(|(_, ch)| *ch != '\n') {}
-                    continue;
-                }
                 '#' => {
                     while let Some(_) = chars.next_if(|(_, ch)| *ch != '\n') {}
                     continue;
                 }
+                // TODO: Should multiline comments be nesteable?
+                '(' if chars.next_if(|(_, ch)| *ch == '#').is_some() => loop {
+                    match chars.next() {
+                        Some((_, '#')) if chars.next_if(|(_, ch)| *ch == ')').is_some() => {
+                            continue 'outer;
+                        }
+                        Some(_) => {}
+                        None => panic!(),
+                    }
+                },
 
                 '=' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::EqualGreater,
                 '-' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::HyphenGreater,
