@@ -13,6 +13,7 @@ pub enum SynData {
     False(Token),
     True(Token),
     Number(Token),
+    Equal(Syn, Syn),
     Add(Syn, Syn),
     Subtract(Syn, Syn),
     Multiply(Syn, Syn),

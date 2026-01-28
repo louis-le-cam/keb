@@ -70,6 +70,7 @@ pub fn lex(source: &str) -> Tokens {
 
                 '=' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::EqualGreater,
                 '-' if chars.next_if(|(_, ch)| *ch == '>').is_some() => TokenKind::HyphenGreater,
+                '=' if chars.next_if(|(_, ch)| *ch == '=').is_some() => TokenKind::DoubleEqual,
                 '=' => TokenKind::Equal,
                 '+' => TokenKind::Plus,
                 '-' => TokenKind::Hyphen,

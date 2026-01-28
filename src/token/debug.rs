@@ -14,6 +14,8 @@ pub fn debug(source: &str, tokens: &Tokens) {
         let text = match kind {
             TokenKind::EqualGreater => "=>".bright_yellow(),
             TokenKind::HyphenGreater => "->".bright_yellow(),
+            TokenKind::DoubleEqual => "==".bright_yellow(),
+
             TokenKind::Equal => "=".bright_yellow(),
             TokenKind::Plus => "+".bright_yellow(),
             TokenKind::Hyphen => "-".bright_yellow(),

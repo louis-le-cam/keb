@@ -4,6 +4,7 @@ use crate::key_vec::{Index, KeyVec, Sentinel};
 pub enum TokenKind {
     EqualGreater,
     HyphenGreater,
+    DoubleEqual,
 
     Equal,
     Plus,

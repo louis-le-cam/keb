@@ -142,7 +142,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
     }
 
     fn parse_application(&mut self) -> Option<Syn> {
-        let syn = self.parse_additive()?;
+        let syn = self.parse_comparative()?;
 
         Some(match self.parse_application() {
             Some(argument) => self.syntax.push(SynData::Application {
@@ -151,6 +151,23 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             }),
             None => syn,
         })
+    }
+
+    fn parse_comparative(&mut self) -> Option<Syn> {
+        let mut syn = self.parse_additive()?;
+
+        loop {
+            match self.tokens.peek() {
+                Some((_, TokenKind::DoubleEqual)) => {
+                    self.tokens.next();
+                    let rhs = self.parse_additive().unwrap();
+                    syn = self.syntax.push(SynData::Equal(syn, rhs))
+                }
+                _ => break,
+            }
+        }
+
+        Some(syn)
     }
 
     fn parse_additive(&mut self) -> Option<Syn> {
@@ -262,6 +279,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
             TokenKind::EqualGreater
             | TokenKind::HyphenGreater
+            | TokenKind::DoubleEqual
             | TokenKind::Equal
             | TokenKind::Plus
             | TokenKind::Hyphen

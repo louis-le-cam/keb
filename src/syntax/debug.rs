@@ -50,6 +50,7 @@ impl Debug for DebugSyn<'_> {
             SynData::False(_) => ("false".bright_purple(), &[]),
             SynData::True(_) => ("true".bright_purple(), &[]),
             SynData::Number(_) => ("number".bright_purple(), &[]),
+            SynData::Equal(lhs, rhs) => ("equal".bright_yellow(), &[*lhs, *rhs]),
             SynData::Add(lhs, rhs) => ("add".bright_yellow(), &[*lhs, *rhs]),
             SynData::Subtract(lhs, rhs) => ("sub".bright_yellow(), &[*lhs, *rhs]),
             SynData::Multiply(lhs, rhs) => ("mul".bright_yellow(), &[*lhs, *rhs]),

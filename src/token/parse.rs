@@ -66,7 +66,7 @@ pub fn parse_string_escape(source: &str, tokens: &TokenOffsets, token: Token) ->
 
 pub fn token_length(source: &str, tokens: &Tokens, token: Token) -> usize {
     match tokens.kinds[token] {
-        TokenKind::EqualGreater | TokenKind::HyphenGreater => 2,
+        TokenKind::EqualGreater | TokenKind::HyphenGreater | TokenKind::DoubleEqual => 2,
         TokenKind::Equal
         | TokenKind::Plus
         | TokenKind::Hyphen
