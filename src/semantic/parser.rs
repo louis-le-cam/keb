@@ -148,6 +148,58 @@ impl Parser<'_> {
                 let body = self.parse_expression(*body);
                 self.push(SemKind::Loop(body))
             }
+            SynData::Match(curly) => {
+                let function = self.push(SemKind::Function {
+                    argument: "__param".to_string(),
+                    body: Sem::from_u32_index(0),
+                });
+
+                let reversed_arms: &mut dyn Iterator<Item = (Syn, Syn)> = match self.syntax[*curly]
+                {
+                    SynData::EmptyCurly(_) => &mut std::iter::empty(),
+                    SynData::Curly(content) => match &self.syntax[content] {
+                        SynData::Function { pattern, body } => {
+                            &mut std::iter::once((*pattern, *body))
+                        }
+                        SynData::Tuple(arms) => {
+                            &mut arms.iter().rev().map(|arm| match &self.syntax[*arm] {
+                                SynData::Function { pattern, body } => (*pattern, *body),
+                                _ => panic!(),
+                            })
+                        }
+                        _ => panic!(),
+                    },
+                    _ => panic!(),
+                };
+
+                let param = self.push(SemKind::Reference {
+                    name: "__param".to_string(),
+                });
+
+                let empty_chain = self.push(SemKind::ChainClosed {
+                    statements: Vec::new(),
+                });
+                let mut rest = self.push(SemKind::Loop(empty_chain));
+
+                for (pattern, body) in reversed_arms {
+                    let body = self.parse_expression(body);
+                    rest = self.sift_through_optional_pattern(param, pattern, body, rest);
+                }
+
+                if let SemKind::Function { body, .. } = &mut self.semantic.kinds[function] {
+                    *body = rest;
+                } else {
+                    panic!()
+                }
+
+                let function_type = self.types.push(TypeData::Function {
+                    argument_type: self.semantic.types[param],
+                    return_type: TypeSentinel::Unknown.to_index(),
+                });
+                self.add_type(function, function_type);
+
+                function
+            }
             SynData::If { condition, then } => {
                 let condition = self.parse_expression(*condition);
                 let then = self.parse_expression(*then);
@@ -305,6 +357,93 @@ impl Parser<'_> {
         }
     }
 
+    fn sift_through_optional_pattern(
+        &mut self,
+        value: Sem,
+        pattern: Syn,
+        then: Sem,
+        else_: Sem,
+    ) -> Sem {
+        match &self.syntax[pattern] {
+            SynData::Ident(token) => self.push(SemKind::Binding {
+                name: token::parse_identifer(self.source, self.tokens, *token).to_string(),
+                value,
+                body: then,
+            }),
+            SynData::False(token) => {
+                self.add_type(value, TypeSentinel::False.to_index());
+                let false_ = self.push(SemKind::False(*token));
+                let structure = self.push(SemKind::BuildStruct {
+                    fields: vec![("0".to_string(), value), ("1".to_string(), false_)],
+                });
+
+                let add_function = self.push(SemKind::Reference {
+                    name: "builtin_equal".to_string(),
+                });
+
+                let condition = self.push(SemKind::Application {
+                    function: add_function,
+                    argument: structure,
+                });
+
+                self.push(SemKind::IfElse {
+                    condition,
+                    then,
+                    else_,
+                })
+            }
+            SynData::True(_) => {
+                self.add_type(value, TypeSentinel::True.to_index());
+
+                self.push(SemKind::IfElse {
+                    condition: value,
+                    then,
+                    else_,
+                })
+            }
+            SynData::Number(token) => {
+                self.add_type(value, TypeSentinel::Uint32.to_index());
+
+                let number = self.push(SemKind::Number(*token));
+
+                let structure = self.push(SemKind::BuildStruct {
+                    fields: vec![("0".to_string(), value), ("1".to_string(), number)],
+                });
+
+                let add_function = self.push(SemKind::Reference {
+                    name: "builtin_equal".to_string(),
+                });
+
+                let condition = self.push(SemKind::Application {
+                    function: add_function,
+                    argument: structure,
+                });
+
+                self.push(SemKind::IfElse {
+                    condition,
+                    then,
+                    else_,
+                })
+            }
+
+            SynData::Mut { .. } => todo!(),
+            SynData::Ascription { .. } => todo!(),
+            SynData::EmptyParen(_) => todo!(),
+            SynData::Paren(_) => todo!(),
+
+            SynData::EmptyCurly(_) => todo!(),
+            SynData::Curly(_) => todo!(),
+
+            SynData::Tuple(_) => todo!(),
+
+            SynData::Application { .. } => todo!(),
+
+            SynData::String(_) => todo!(),
+
+            _ => panic!(),
+        }
+    }
+
     fn parse_type(&mut self, i: Syn) -> Type {
         match &self.syntax[i] {
             SynData::Ident(token) => {
@@ -324,7 +463,7 @@ impl Parser<'_> {
                     return_type: return_type,
                 })
             }
-            SynData::EmptyParen(_) => self.types.push(TypeData::Product { fields: Vec::new() }),
+            SynData::EmptyParen(_) => TypeSentinel::Unit.to_index(),
             SynData::Paren(expr) => self.parse_type(*expr),
             SynData::Tuple(sems) => {
                 let fields = sems

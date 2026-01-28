@@ -80,7 +80,7 @@ fn factorial_recursive_if_then_else() {
 #[should_panic]
 fn print_string() {
     let source = r#"
-        let main = (
+        let main = () => (
             let hello_world = "Hello world!";
 
             print hello_world;
@@ -90,17 +90,15 @@ fn print_string() {
     test_program(source, "Hello world!\n");
 }
 
-// NOTE: Not yet implemented
 #[test]
-#[should_panic]
 fn factorial_recursive_match() {
     let source = r#"
         let fact = match {
-            0 | 1 => 1,
-            n => n * fact n - 1,
+            0 => 1,
+            n => n * (fact n - 1),
         };
 
-        let main = print fact 8;
+        let main = () => print fact 8;
     "#;
 
     test_program(source, "40320\n");

@@ -27,10 +27,9 @@ struct Inferrer<'a> {
 
 impl Inferrer<'_> {
     fn infer_root(&mut self) {
-        let unit = self.types.push(TypeData::Product { fields: Vec::new() });
         let print = self.types.push(TypeData::Function {
             argument_type: TypeSentinel::Uint32.to_index(),
-            return_type: unit,
+            return_type: TypeSentinel::Unit.to_index(),
         });
 
         let mut scope = Scope::from([("print".to_string(), ScopeItem::Type(print))]);
@@ -85,7 +84,12 @@ impl Inferrer<'_> {
                     .map(|(name, value)| (name.clone(), { self.semantic.types[*value] }))
                     .collect::<Vec<(String, Type)>>();
 
-                let type_ = self.types.push(TypeData::Product { fields });
+                let type_ = if fields.len() == 0 {
+                    TypeSentinel::Unit.to_index()
+                } else {
+                    self.types.push(TypeData::Product { fields })
+                };
+
                 self.add_type(i, type_);
             }
             SemKind::Function { argument, body } => {
