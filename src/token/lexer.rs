@@ -118,6 +118,7 @@ pub fn lex(source: &str) -> Tokens {
                         "let" => TokenKind::Let,
                         "mut" => TokenKind::Mut,
                         "loop" => TokenKind::Loop,
+                        "match" => TokenKind::Match,
                         "if" => TokenKind::If,
                         "then" => TokenKind::Then,
                         "else" => TokenKind::Else,

@@ -98,10 +98,16 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         let mut syns = vec![syn];
 
         loop {
-            syns.push(self.parse_function().unwrap());
+            let Some(syn) = self.parse_function() else {
+                break;
+            };
+
+            syns.push(syn);
 
             match self.tokens.peek() {
-                Some((_, TokenKind::Comma)) => {}
+                Some((_, TokenKind::Comma)) => {
+                    self.tokens.next();
+                }
                 _ => break,
             };
         }
@@ -241,6 +247,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 let body = self.parse_application().unwrap();
                 self.syntax.push(SynData::Loop(body))
             }
+            TokenKind::Match => self.parse_match(),
             TokenKind::If => self.parse_if(),
             TokenKind::False => {
                 self.tokens.next();
@@ -327,6 +334,16 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             pattern: pattern,
             value: value,
         })
+    }
+
+    fn parse_match(&mut self) -> Syn {
+        let Some((_, TokenKind::Match)) = self.tokens.next() else {
+            panic!()
+        };
+
+        let content = self.parse_curly();
+
+        self.syntax.push(SynData::Match(content))
     }
 
     fn parse_if(&mut self) -> Syn {

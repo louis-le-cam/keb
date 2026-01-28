@@ -1,6 +1,6 @@
-let add = (a: u32, b: u32) => a + b;
+let fact = match {
+    0 => 1,
+    n => n * fact n - 1,
+};
 
-let main = () => (
-    let x = if false then 1 else 2;
-    print x;
-);
+let main = print fact 8;

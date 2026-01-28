@@ -93,6 +93,7 @@ pub fn token_length(source: &str, tokens: &Tokens, token: Token) -> usize {
         | TokenKind::Let
         | TokenKind::Mut
         | TokenKind::Loop
+        | TokenKind::Match
         | TokenKind::If
         | TokenKind::Then
         | TokenKind::Else

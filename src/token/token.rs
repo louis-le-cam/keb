@@ -26,6 +26,7 @@ pub enum TokenKind {
     Let,
     Mut,
     Loop,
+    Match,
     If,
     Then,
     Else,

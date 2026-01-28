@@ -74,6 +74,7 @@ impl Debug for DebugSyn<'_> {
                 ("application".bright_green(), &[*function, *argument])
             }
             SynData::Loop(body) => ("loop".bright_red(), &[*body]),
+            SynData::Match(content) => ("match".bright_red(), &[*content]),
             SynData::If { condition, then } => ("if".bright_red(), &[*condition, *then]),
             SynData::IfElse {
                 condition,

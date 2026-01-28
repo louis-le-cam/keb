@@ -37,6 +37,7 @@ pub fn debug(source: &str, tokens: &Tokens) {
             TokenKind::Let => "let".bright_red(),
             TokenKind::Mut => "mut".bright_red(),
             TokenKind::Loop => "loop".bright_red(),
+            TokenKind::Match => "match".bright_red(),
             TokenKind::If => "if".bright_red(),
             TokenKind::Then => "then".bright_red(),
             TokenKind::Else => "else".bright_red(),

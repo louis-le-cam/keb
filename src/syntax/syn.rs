@@ -59,6 +59,7 @@ pub enum SynData {
         argument: Syn,
     },
     Loop(Syn),
+    Match(Syn),
     If {
         condition: Syn,
         then: Syn,
