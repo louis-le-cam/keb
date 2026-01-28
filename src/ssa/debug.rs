@@ -63,6 +63,12 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                         print!("{}", debug_expr(field));
                     }
                 }
+                InstData::Equal(lhs, rhs) => print!(
+                    "{} {}, {}",
+                    "equal".bright_red().bold(),
+                    debug_expr(lhs),
+                    debug_expr(rhs),
+                ),
                 InstData::Add(lhs, rhs) => print!(
                     "{} {}, {}",
                     "add".bright_red().bold(),

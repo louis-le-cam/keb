@@ -124,6 +124,7 @@ impl Parser<'_> {
 
                 sem
             }
+            SynData::Equal(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_equal"),
             SynData::Add(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_add"),
             SynData::Subtract(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_sub"),
             SynData::Multiply(lhs, rhs) => self.parse_binary_operator(*lhs, *rhs, "builtin_mul"),

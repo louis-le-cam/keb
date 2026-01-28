@@ -212,6 +212,11 @@ impl Generator<'_> {
                         .map(|field| format!("{}, ", self.generate_expr(*field)))
                         .collect::<String>()
                 )),
+                InstData::Equal(lhs, rhs) => body.push_str(&format!(
+                    "{} == {}",
+                    self.generate_expr(*lhs),
+                    self.generate_expr(*rhs),
+                )),
                 InstData::Add(lhs, rhs) => body.push_str(&format!(
                     "{} + {}",
                     self.generate_expr(*lhs),

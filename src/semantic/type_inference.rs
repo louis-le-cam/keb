@@ -46,7 +46,13 @@ impl Inferrer<'_> {
             return_type: TypeSentinel::Uint32.to_index(),
         });
 
-        for name in ["builtin_add", "builtin_sub", "builtin_mul", "builtin_div"] {
+        for name in [
+            "builtin_equal",
+            "builtin_add",
+            "builtin_sub",
+            "builtin_mul",
+            "builtin_div",
+        ] {
             scope.insert(name.to_string(), ScopeItem::Type(binary_function_type));
         }
 

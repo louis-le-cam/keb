@@ -58,7 +58,11 @@ impl Generator<'_> {
         });
 
         for (name, inst_data) in [
-            ("builtin_add", InstData::Add as fn(Expr, Expr) -> InstData),
+            (
+                "builtin_equal",
+                InstData::Equal as fn(Expr, Expr) -> InstData,
+            ),
+            ("builtin_add", InstData::Add),
             ("builtin_sub", InstData::Sub),
             ("builtin_mul", InstData::Mul),
             ("builtin_div", InstData::Div),

@@ -36,7 +36,8 @@ impl Ssa {
                 }
             }
             InstData::Record(_, ty) => *ty,
-            InstData::Add(lhs, _)
+            InstData::Equal(lhs, _)
+            | InstData::Add(lhs, _)
             | InstData::Sub(lhs, _)
             | InstData::Mul(lhs, _)
             | InstData::Div(lhs, _) => self.expression_type(types, *lhs),
@@ -238,6 +239,7 @@ pub enum BlockData {
 pub enum InstData {
     Field(Expr, u32),
     Record(Vec<Expr>, Type),
+    Equal(Expr, Expr),
     Add(Expr, Expr),
     Sub(Expr, Expr),
     Mul(Expr, Expr),
