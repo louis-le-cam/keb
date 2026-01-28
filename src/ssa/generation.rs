@@ -129,7 +129,8 @@ impl Generator<'_> {
 
                 let mutable_bindings = if let SemKind::MutBinding { .. } = self.semantic.kinds[sem]
                 {
-                    HashSet::from([name.to_string()])
+                    todo!("mutable bindings are not working whenever branching is involved")
+                    // HashSet::from([name.to_string()])
                 } else {
                     HashSet::new()
                 };

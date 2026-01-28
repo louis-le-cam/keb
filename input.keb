@@ -1,9 +1,6 @@
 let add = (a: u32, b: u32) => a + b;
 
-# TODO: This code doesn't work, 2 is printed, see the todo message in
-# `src/ssa/generation.rs:147`
 let main = () => (
-    let mut x = 0;
-    if false then (x = 1;) else (x = 2);
+    let x = if false then 1 else 2;
     print x;
 );
