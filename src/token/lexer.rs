@@ -92,8 +92,8 @@ pub fn lex(source: &str) -> Tokens {
                     }
                 }
 
-                '0'..='9' => {
-                    while let Some(_) = chars.next_if(|(_, ch)| matches!(ch, '0'..='9')) {}
+                _ if char.is_ascii_digit() => {
+                    while let Some(_) = chars.next_if(|(_, ch)| ch.is_ascii_digit()) {}
                     TokenKind::Number
                 }
                 _ if unicode_ident::is_xid_start(char) => {

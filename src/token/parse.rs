@@ -27,13 +27,13 @@ pub fn parse_u64(source: &str, tokens: &TokenOffsets, token: Token) -> u64 {
         source_from_token
             .chars()
             .next()
-            .is_some_and(|ch| matches!(ch, '0'..='9'))
+            .is_some_and(|ch| ch.is_ascii_digit())
     );
 
     source_from_token[..source_from_token
         .char_indices()
         .skip(1)
-        .find(|(_, ch)| !matches!(ch, '0'..='9'))
+        .find(|(_, ch)| !ch.is_ascii_digit())
         .map(|(i, _)| i)
         .unwrap_or(source_from_token.len())]
         .parse()
@@ -85,7 +85,7 @@ pub fn token_length(source: &str, tokens: &Tokens, token: Token) -> usize {
             source_from_token
                 .char_indices()
                 .skip(1)
-                .find(|(_, ch)| !matches!(ch, '0'..='9'))
+                .find(|(_, ch)| !ch.is_ascii_digit())
                 .map(|(i, _)| i)
                 .unwrap_or(source_from_token.len())
         }
