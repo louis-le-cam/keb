@@ -47,14 +47,12 @@ fn computed_span(source: &str, tokens: &Tokens, span: &Span) -> ComputedSpan {
 
     let first_column = source[..start]
         .lines()
-        .rev()
-        .next()
+        .next_back()
         .map(|line| line.chars().count())
         .unwrap_or(0);
     let last_column = source[..end]
         .lines()
-        .rev()
-        .next()
+        .next_back()
         .map(|line| line.chars().count())
         .unwrap_or(0);
 
@@ -98,10 +96,9 @@ pub fn print_diagnostic(source: &str, tokens: &Tokens, diagnostic: &Diagnostic) 
 
     println!("{level}{}{}", ": ".bold(), diagnostic.message.bold());
     println!(
-        "{}{} {}:{}:{}",
-        " ".repeat(max_line_number_width as usize),
+        "{}{} input.keb:{}:{}",
+        " ".repeat(max_line_number_width),
         "-->".bright_blue().bold(),
-        "input.keb",
         spans[0].first_line + 1,
         spans[0].first_column + 1,
     );
@@ -115,7 +112,7 @@ pub fn print_diagnostic(source: &str, tokens: &Tokens, diagnostic: &Diagnostic) 
 
         println!(
             "{} {}",
-            " ".repeat(max_line_number_width as usize),
+            " ".repeat(max_line_number_width),
             "|".bright_blue().bold(),
         );
 
@@ -131,13 +128,13 @@ pub fn print_diagnostic(source: &str, tokens: &Tokens, diagnostic: &Diagnostic) 
                     .bold(),
                 "|".bright_blue().bold(),
                 line,
-                width = max_line_number_width as usize,
+                width = max_line_number_width,
             )
         }
 
         println!(
             "{} {} {}{} {}",
-            " ".repeat(max_line_number_width as usize),
+            " ".repeat(max_line_number_width),
             "|".bright_blue().bold(),
             " ".repeat(computed_span.first_column),
             symbol.repeat(computed_span.width).color(color).bold(),
@@ -145,17 +142,17 @@ pub fn print_diagnostic(source: &str, tokens: &Tokens, diagnostic: &Diagnostic) 
         );
     }
 
-    if diagnostic.notes.len() != 0 {
+    if diagnostic.notes.is_empty() {
         println!(
             "{} {}",
-            " ".repeat(max_line_number_width as usize),
+            " ".repeat(max_line_number_width),
             "|".bright_blue().bold(),
         );
 
         for note in &diagnostic.notes {
             println!(
                 "{} {} {} {}",
-                " ".repeat(max_line_number_width as usize),
+                " ".repeat(max_line_number_width),
                 "=".bright_blue().bold(),
                 "note:".bold(),
                 note,

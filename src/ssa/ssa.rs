@@ -94,7 +94,7 @@ impl Ssa {
     }
 
     pub fn const_product(&mut self, types: &mut Types, fields: Vec<Const>) -> Const {
-        if fields.len() == 0 {
+        if fields.is_empty() {
             return ConstSentinel::Unit.to_index();
         }
 
@@ -132,7 +132,7 @@ impl Ssa {
     }
 
     pub fn inst_product(&mut self, types: &mut Types, block: Block, fields: Vec<Expr>) -> Inst {
-        let type_ = if fields.len() == 0 {
+        let type_ = if fields.is_empty() {
             TypeSentinel::Unit.to_index()
         } else {
             let type_fields = fields

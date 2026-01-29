@@ -84,7 +84,7 @@ impl Inferrer<'_> {
                     .map(|(name, value)| (name.clone(), { self.semantic.types[*value] }))
                     .collect::<Vec<(String, Type)>>();
 
-                let type_ = if fields.len() == 0 {
+                let type_ = if fields.is_empty() {
                     TypeSentinel::Unit.to_index()
                 } else {
                     self.types.push(TypeData::Product { fields })
@@ -114,7 +114,7 @@ impl Inferrer<'_> {
 
                     let body_type = self.semantic.types[body];
 
-                    let return_type = combine_types(&mut self.types, body_type, return_type);
+                    let return_type = combine_types(self.types, body_type, return_type);
 
                     let type_ = self.types.push(TypeData::Function {
                         argument_type,
@@ -208,20 +208,16 @@ impl Inferrer<'_> {
 
                 match self.types.get(self.semantic.types[expr]) {
                     Val::None => panic!(),
-                    Val::Sentinel(sentinel) => match sentinel {
-                        TypeSentinel::Unknown => {}
-                        _ => {}
-                    },
-                    Val::Value(type_data) => match type_data {
-                        TypeData::Product { fields } => {
-                            if let Some((_, field_type)) =
-                                fields.iter().find(|(name, _)| name == &field)
-                            {
-                                self.add_type(i, *field_type);
-                            }
+                    // TODO: Infer for unknown types
+                    Val::Sentinel(_) => {}
+                    Val::Value(TypeData::Product { fields }) => {
+                        if let Some((_, field_type)) =
+                            fields.iter().find(|(name, _)| name == &field)
+                        {
+                            self.add_type(i, *field_type);
                         }
-                        _ => {}
-                    },
+                    }
+                    Val::Value(_) => panic!(),
                 }
             }
             SemKind::Application { function, argument } => {

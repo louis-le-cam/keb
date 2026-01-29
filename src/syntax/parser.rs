@@ -30,9 +30,10 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         assert_eq!(root, syntax::ROOT_SYN);
 
         let syns = std::iter::from_fn(|| {
-            while let Some(_) = self
+            while self
                 .tokens
                 .next_if(|(_, token)| matches!(token, TokenKind::Semicolon))
+                .is_some()
             {}
 
             self.parse_tuple()
@@ -97,11 +98,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         let mut syns = vec![syn];
 
-        loop {
-            let Some(syn) = self.parse_function() else {
-                break;
-            };
-
+        while let Some(syn) = self.parse_function() {
             syns.push(syn);
 
             match self.tokens.peek() {
@@ -156,15 +153,10 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
     fn parse_comparative(&mut self) -> Option<Syn> {
         let mut syn = self.parse_additive()?;
 
-        loop {
-            match self.tokens.peek() {
-                Some((_, TokenKind::DoubleEqual)) => {
-                    self.tokens.next();
-                    let rhs = self.parse_additive().unwrap();
-                    syn = self.syntax.push(SynData::Equal(syn, rhs))
-                }
-                _ => break,
-            }
+        while let Some((_, TokenKind::DoubleEqual)) = self.tokens.peek() {
+            self.tokens.next();
+            let rhs = self.parse_additive().unwrap();
+            syn = self.syntax.push(SynData::Equal(syn, rhs))
         }
 
         Some(syn)

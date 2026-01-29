@@ -40,7 +40,7 @@ pub fn lex(source: &str) -> Tokens {
                 }
 
                 '#' => {
-                    while let Some(_) = chars.next_if(|(_, ch)| *ch != '\n') {}
+                    while chars.next_if(|(_, ch)| *ch != '\n').is_some() {}
                     continue;
                 }
                 // TODO: Should multiline comments be nesteable?
@@ -93,13 +93,14 @@ pub fn lex(source: &str) -> Tokens {
                 }
 
                 _ if char.is_ascii_digit() => {
-                    while let Some(_) = chars.next_if(|(_, ch)| ch.is_ascii_digit()) {}
+                    while chars.next_if(|(_, ch)| ch.is_ascii_digit()).is_some() {}
                     TokenKind::Number
                 }
                 _ if unicode_ident::is_xid_start(char) => {
-                    while let Some(_) = chars.next_if(|(_, ch)| unicode_ident::is_xid_continue(*ch))
-                    {
-                    }
+                    while chars
+                        .next_if(|(_, ch)| unicode_ident::is_xid_continue(*ch))
+                        .is_some()
+                    {}
 
                     let end = chars.peek().map(|(i, _)| *i).unwrap_or(source.len());
 
@@ -117,7 +118,7 @@ pub fn lex(source: &str) -> Tokens {
                     }
                 }
                 _ if char.is_whitespace() => {
-                    while let Some(_) = chars.next_if(|(_, ch)| ch.is_whitespace()) {}
+                    while chars.next_if(|(_, ch)| ch.is_whitespace()).is_some() {}
                     continue;
                 }
                 _ => panic!("Unexpected character: {char:?}"),

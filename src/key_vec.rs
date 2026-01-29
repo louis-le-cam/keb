@@ -50,7 +50,7 @@ pub trait Sentinel: Sized + Clone + Copy {
 
 pub trait NonEmptySentinel: Sentinel {}
 
-pub unsafe trait EmptySentinel: Sentinel {}
+pub trait EmptySentinel: Sentinel {}
 
 #[derive(Clone, Copy)]
 pub struct Index<S: Sentinel> {
@@ -169,19 +169,15 @@ mod derive {
         derive() (
             $(#[$($attr:tt)*])* $vis:vis enum $name:ident {}
         ) => {
-            // SAFETY: Guarrantee that the enum has size `0`.
+            // Check that the enum has size `0`.
             const _: () = ::core::assert!(::core::mem::size_of::<$name>() == 0);
-            // SAFETY: Guarrantee that the enum has no variant, i.e. the enum
-            // is not inhabited.
+            // Check that the enum has no variant, i.e. the enum is not
+            // inhabited.
             const _: () = {
                 let _ = |value: $name| match value {};
             };
 
-            // SAFETY: We triple check that the enum is empty.
-            // - The derive macro syntax parses only enum with no variants
-            // - We assert at compile-time that the size of the `enum` is `0`
-            // - We assert that the `enum` is not inhabited with a empty `match`
-            unsafe impl $crate::key_vec::EmptySentinel for $name { }
+            impl $crate::key_vec::EmptySentinel for $name { }
 
             impl $crate::key_vec::Sentinel for $name {
                 fn from_index(

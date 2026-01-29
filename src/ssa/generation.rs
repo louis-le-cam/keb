@@ -121,7 +121,7 @@ impl Generator<'_> {
     pub fn generate_expression(&mut self, block: &mut Block, sem: Sem, scope: &mut Scope) -> Expr {
         match &self.semantic.kinds[sem] {
             SemKind::Number(token) => {
-                let value = token::parse_u64(self.source, &self.tokens, *token) as u32;
+                let value = token::parse_u64(self.source, self.tokens, *token) as u32;
                 Expr::Const(self.ssa.const_u32(value))
             }
             SemKind::False(_) => Expr::Const(ConstSentinel::False.to_index()),

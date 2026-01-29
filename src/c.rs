@@ -39,10 +39,10 @@ impl Generator<'_> {
             self.ssa
                 .blocks
                 .entries()
-                .find(|(_, block_data)| match block_data {
-                    BlockData::Function { name, .. } if name == "main" => true,
-                    _ => false,
-                })
+                .find(|(_, block_data)| matches!(
+                    block_data,
+                    BlockData::Function { name, .. } if name == "main",
+                ))
                 .unwrap()
                 .0
                 .as_u32()
@@ -297,7 +297,7 @@ impl Generator<'_> {
     }
 
     fn generate_type(&mut self, type_: Type) -> String {
-        let c_type = match self.types.get(type_) {
+        match self.types.get(type_) {
             Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
@@ -307,7 +307,7 @@ impl Generator<'_> {
             },
             Val::Value(type_data) => match type_data {
                 TypeData::Function { .. } => todo!(),
-                TypeData::Product { fields } if fields.len() == 0 => "void".to_string(),
+                TypeData::Product { fields } if fields.is_empty() => "void".to_string(),
                 TypeData::Product { fields } => {
                     if let Some((ty, _)) = self
                         .structs
@@ -329,12 +329,10 @@ impl Generator<'_> {
 
                     self.structs.push((type_, value));
 
-                    return format!("struct t{}", type_.as_u32());
+                    format!("struct t{}", type_.as_u32())
                 }
             },
-        };
-
-        c_type
+        }
     }
 
     fn generate_expr(&mut self, expr: Expr) -> String {
