@@ -77,18 +77,18 @@ pub fn lex(source: &str) -> Tokens {
 
                     TokenKind::LeftCurly
                 }
-                '}' => {
-                    if let Some(curly_count) = interpolations_curly_nesting.last_mut() {
-                        if let Some(new_curly_count) = curly_count.checked_sub(1) {
-                            *curly_count = new_curly_count;
-                            TokenKind::RightCurly
-                        } else {
-                            interpolations_curly_nesting.pop();
-                            in_string = true;
-                            TokenKind::InterpolationEnd
-                        }
-                    } else {
+                '}' => 'token: {
+                    let Some(curly_count) = interpolations_curly_nesting.last_mut() else {
+                        break 'token TokenKind::RightCurly;
+                    };
+
+                    if let Some(new_curly_count) = curly_count.checked_sub(1) {
+                        *curly_count = new_curly_count;
                         TokenKind::RightCurly
+                    } else {
+                        interpolations_curly_nesting.pop();
+                        in_string = true;
+                        TokenKind::InterpolationEnd
                     }
                 }
 
@@ -101,7 +101,9 @@ pub fn lex(source: &str) -> Tokens {
                     {
                     }
 
-                    match &source[start..chars.peek().map(|(i, _)| *i).unwrap_or(source.len())] {
+                    let end = chars.peek().map(|(i, _)| *i).unwrap_or(source.len());
+
+                    match &source[start..end] {
                         "let" => TokenKind::Let,
                         "mut" => TokenKind::Mut,
                         "loop" => TokenKind::Loop,
