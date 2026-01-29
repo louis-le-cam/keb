@@ -348,10 +348,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         let value = self.parse_tuple().unwrap();
 
-        self.syntax.push(SynData::Binding {
-            pattern: pattern,
-            value: value,
-        })
+        self.syntax.push(SynData::Binding { pattern, value })
     }
 
     fn parse_match(&mut self) -> Syn {

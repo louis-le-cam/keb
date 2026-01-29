@@ -459,8 +459,8 @@ impl Parser<'_> {
                 let argument_type = self.parse_type(*pattern);
                 let return_type = self.parse_type(*type_);
                 self.types.push(TypeData::Function {
-                    argument_type: argument_type,
-                    return_type: return_type,
+                    argument_type,
+                    return_type,
                 })
             }
             SynData::EmptyParen(_) => TypeSentinel::Unit.to_index(),

@@ -73,11 +73,7 @@ impl Ssa {
     }
 
     pub fn extern_function(&mut self, name: String, arg: Type, ret: Type) -> Block {
-        self.block(BlockData::ExternFunction {
-            name: name,
-            arg,
-            ret,
-        })
+        self.block(BlockData::ExternFunction { name, arg, ret })
     }
 
     pub fn function(&mut self, name: String, arg: Type, ret: Type) -> Block {
