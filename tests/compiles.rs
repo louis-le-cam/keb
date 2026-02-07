@@ -7,7 +7,7 @@ use std::{
     random::random,
 };
 
-use keb::{c, semantic, ssa, syntax, token};
+use keb::{c_codegen, semantic, ssa, syntax, token};
 
 fn test_program(source: &str, expected_output: &str) {
     let tokens = token::lex(&source);
@@ -15,7 +15,7 @@ fn test_program(source: &str, expected_output: &str) {
     let (mut semantic, mut types) = semantic::parse(&source, &tokens.offsets, &syntax);
     semantic::infer_types(&mut semantic, &mut types);
     let ssa = ssa::generate(&source, &tokens.offsets, &semantic, &mut types);
-    let c = c::generate(&types, &ssa);
+    let c = c_codegen::generate(&types, &ssa);
 
     let program_path = temp_dir().join(format!("keb-test-c-output-{:0>32x}.c", random::<u128>(..)));
 
@@ -27,7 +27,7 @@ fn test_program(source: &str, expected_output: &str) {
         .unwrap();
 
     let stdin = clang.stdin.as_mut().unwrap();
-    stdin.write_all(c.as_bytes()).unwrap();
+    stdin.write_all(c_codegen.as_bytes()).unwrap();
     stdin.flush().unwrap();
 
     assert!(clang.wait_with_output().unwrap().status.success());

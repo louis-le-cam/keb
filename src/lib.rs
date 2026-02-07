@@ -1,7 +1,7 @@
 #![feature(macro_attr)]
 #![feature(macro_derive)]
 
-pub mod c;
+pub mod c_codegen;
 pub mod diagnotic;
 pub mod key_vec;
 pub mod semantic;

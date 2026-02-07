@@ -4,7 +4,7 @@
 use std::process::Command;
 
 use colored::Colorize;
-use keb::{c, semantic, ssa, syntax, token};
+use keb::{c_codegen, semantic, ssa, syntax, token};
 
 fn main() {
     debug_header("SOURCE (colored based on tokens)");
@@ -26,8 +26,8 @@ fn main() {
     debug_header("SSA");
     ssa::debug(&types, &ssa);
 
-    let c = c::generate(&types, &ssa);
-    std::fs::write("output.c", c).unwrap();
+    let c_code = c_codegen::generate(&types, &ssa);
+    std::fs::write("output.c", c_code).unwrap();
 
     debug_header("CLANG");
     let clang_exit_status = Command::new("clang")
