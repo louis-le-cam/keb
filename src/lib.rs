@@ -8,3 +8,4 @@ pub mod semantic;
 pub mod ssa;
 pub mod syntax;
 pub mod token;
+pub mod x86_asm_codegen;

@@ -59,6 +59,10 @@ pub struct Index<S: Sentinel> {
 }
 
 impl<S: Sentinel, V> KeyVec<S, V> {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn from_vec(vec: Vec<V>) -> Self {
         Self(vec, PhantomData)
     }

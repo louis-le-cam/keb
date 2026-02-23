@@ -27,7 +27,7 @@ fn test_program(source: &str, expected_output: &str) {
         .unwrap();
 
     let stdin = clang.stdin.as_mut().unwrap();
-    stdin.write_all(c_codegen.as_bytes()).unwrap();
+    stdin.write_all(c.as_bytes()).unwrap();
     stdin.flush().unwrap();
 
     assert!(clang.wait_with_output().unwrap().status.success());
