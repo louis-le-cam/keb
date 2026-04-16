@@ -1,6 +1,3 @@
-#![feature(macro_attr)]
-#![feature(macro_derive)]
-
 use std::process::Command;
 
 use colored::Colorize;
