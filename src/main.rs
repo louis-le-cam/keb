@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{process::Command, time::Instant};
 
 use colored::Colorize;
 use keb::{
@@ -9,7 +9,6 @@ use keb::{
 };
 
 fn main() {
-    debug_header("SOURCE (colored based on tokens)");
     let source = std::fs::read_to_string("input.keb").unwrap();
 
     let (types, ssa) = compile_to_ssa(&source);
@@ -19,21 +18,25 @@ fn main() {
 }
 
 fn compile_to_ssa(source: &str) -> (Types, Ssa) {
+    let start = Instant::now();
     let tokens = token::lex(&source);
+    debug_header_duration("SOURCE (colored based on tokens)", start);
     token::debug(&source, &tokens);
 
-    debug_header("SYNTAX");
+    let start = Instant::now();
     let syntax = syntax::parse(&tokens.kinds);
+    debug_header_duration("SYNTAX", start);
     syntax::debug(&syntax);
 
-    debug_header("SEMANTIC");
+    let start = Instant::now();
     let (mut semantic, mut types) = semantic::parse(&source, &tokens.offsets, &syntax);
     semantic::infer_types(&mut semantic, &mut types);
+    debug_header_duration("SEMANTIC", start);
     semantic::debug(&semantic, &types);
 
+    let start = Instant::now();
     let ssa = ssa::generate(&source, &tokens.offsets, &semantic, &mut types);
-
-    debug_header("SSA");
+    debug_header_duration("SSA", start);
     ssa::debug(&types, &ssa);
 
     (types, ssa)
@@ -96,4 +99,18 @@ fn debug_header(text: &str) {
             .bright_yellow()
             .bold()
     );
+}
+
+fn debug_header_duration(text: &str, start: Instant) {
+    let duration = Instant::now().duration_since(start);
+    println!(
+        "\n{}\n",
+        format!(
+            "======== {} {} ========",
+            text.bright_green(),
+            format!("{duration:?}").yellow().normal()
+        )
+        .bright_yellow()
+        .bold()
+    )
 }
