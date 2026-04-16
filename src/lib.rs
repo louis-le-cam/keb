@@ -1,4 +1,3 @@
-#![feature(macro_attr)]
 #![feature(macro_derive)]
 
 pub mod c_codegen;
