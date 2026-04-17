@@ -185,7 +185,23 @@ impl Generator<'_> {
 
                     inst_asm
                 }
-                InstData::Equal(_lhs, _rhs) => todo!(),
+                InstData::Equal(lhs, rhs) => {
+                    let lhs_allocation = self.expr_allocation(*lhs);
+                    let rhs_allocation = self.expr_allocation(*rhs);
+
+                    self.insts_allocations[*inst] = Some(lhs_allocation);
+
+                    let inst_number = inst.as_u32();
+                    format!(
+                        "  cmp {}, {}\n  je i{inst_number}_equal\n  mov {}, {}\n  jmp i{inst_number}_end\ni{inst_number}_equal:\n  mov {}, {}\ni{inst_number}_end:\n\n",
+                        allocation_asm(&lhs_allocation),
+                        allocation_asm(&rhs_allocation),
+                        allocation_asm(&Allocation::Immediate(0)),
+                        allocation_asm(&lhs_allocation),
+                        allocation_asm(&Allocation::Immediate(1)),
+                        allocation_asm(&lhs_allocation),
+                    )
+                }
                 InstData::Add(lhs, rhs) => {
                     let lhs_allocation = self.expr_allocation(*lhs);
                     let rhs_allocation = self.expr_allocation(*rhs);
@@ -478,7 +494,7 @@ impl Generator<'_> {
             Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
-                TypeSentinel::Bool | TypeSentinel::False | TypeSentinel::True => 1,
+                TypeSentinel::Bool | TypeSentinel::False | TypeSentinel::True => 4,
                 TypeSentinel::Unit => 0,
                 TypeSentinel::Uint32 => 4,
             },
