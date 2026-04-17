@@ -67,7 +67,7 @@ fn run_ssa_with_amd64_asm_codegen(types: &Types, ssa: &Ssa) {
     std::fs::write("output.s", asm).unwrap();
 
     debug_header("GCC");
-    let clang_exit_status = Command::new("gcc")
+    let gcc_exit_status = Command::new("gcc")
         .args([
             "-O0",
             "output.s",
@@ -82,7 +82,7 @@ fn run_ssa_with_amd64_asm_codegen(types: &Types, ssa: &Ssa) {
         .wait()
         .unwrap();
 
-    if !clang_exit_status.success() {
+    if !gcc_exit_status.success() {
         return;
     }
 
