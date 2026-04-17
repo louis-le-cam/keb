@@ -2,10 +2,10 @@ use std::{process::Command, time::Instant};
 
 use colored::Colorize;
 use keb::{
-    c_codegen,
+    amd64_asm_codegen, c_codegen,
     semantic::{self, Types},
     ssa::{self, Ssa},
-    syntax, token, x86_asm_codegen,
+    syntax, token,
 };
 
 fn main() {
@@ -14,7 +14,7 @@ fn main() {
     let (types, ssa) = compile_to_ssa(&source);
 
     // run_ssa_with_c_codegen(&types, &ssa);
-    run_ssa_with_x86_asm_codegen(&types, &ssa);
+    run_ssa_with_amd64_asm_codegen(&types, &ssa);
 }
 
 fn compile_to_ssa(source: &str) -> (Types, Ssa) {
@@ -62,9 +62,9 @@ fn run_ssa_with_c_codegen(types: &Types, ssa: &Ssa) {
     Command::new("./a.out").spawn().unwrap().wait().unwrap();
 }
 
-fn run_ssa_with_x86_asm_codegen(types: &Types, ssa: &Ssa) {
-    let x86_asm = x86_asm_codegen::generate(&types, &ssa);
-    std::fs::write("output.s", x86_asm).unwrap();
+fn run_ssa_with_amd64_asm_codegen(types: &Types, ssa: &Ssa) {
+    let asm = amd64_asm_codegen::generate(&types, &ssa);
+    std::fs::write("output.s", asm).unwrap();
 
     debug_header("GCC");
     let clang_exit_status = Command::new("gcc")
