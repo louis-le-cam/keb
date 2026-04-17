@@ -26,7 +26,7 @@ let main = print fact 8;
 # Architecture
 
 The compiler follows a pretty simple multi-stage architecture, each stage
-consumes some of the precedent stages outputs and produces on or multiple
+consumes some of the precedent stages outputs and produces one or multiple
 outputs:
 
 - `lexer/tokenizer`: `source` => `tokens`
