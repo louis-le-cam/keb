@@ -29,11 +29,13 @@ The compiler follows a pretty simple multi-stage architecture, each stage
 consumes some of the precedent stages outputs and produces on or multiple
 outputs:
 
-- lexer/tokenizer: source => tokens
-- syntax parser: tokens => syns(syntax nodes)
-- semantic parser: source, tokens, syns => sems(semantic nodes), types
-- type inference: sems, types => *sems*, *types*
-- ssa generation: source, tokens, sems, types => blocks, instructions, consts, *types*
-- c codegen: sems, types => c source code
+- `lexer/tokenizer`: `source` => `tokens`
+- `syntax parser`: `tokens` => `syns` (syntax nodes)
+- `semantic parser`: `source`, `tokens`, `syns` => `sems` (semantic nodes), `types`
+- `type inference`: `sems`, `types` => `sems`, `types`
+- `ssa generation`: `source`, `tokens`, `sems`, `types` => `blocks`, `instructions`, `consts`, `*types*`
+Then the codegen step can be either:
+- `c codegen`: `sems`, `types` => `c source code`
+- `amd64 codegen`: `sems`, `types` => `gnu assembly`
 
 All theses steps are explicitly written down in `src/main.rs`
