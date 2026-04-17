@@ -210,8 +210,32 @@ impl Generator<'_> {
                         allocation_asm(&lhs_allocation),
                     )
                 }
-                InstData::Mul(_lhs, _rhs) => todo!(),
-                InstData::Div(_lhs, _rhs) => todo!(),
+                InstData::Mul(lhs, rhs) => {
+                    let lhs_allocation = self.expr_allocation(*lhs);
+                    let rhs_allocation = self.expr_allocation(*rhs);
+
+                    self.insts_allocations[*inst] = Some(Allocation::Eax);
+
+                    format!(
+                        "{}  mul {}\n",
+                        self.move_(&lhs_allocation, &Allocation::Eax),
+                        allocation_asm(&rhs_allocation),
+                    )
+                }
+                InstData::Div(lhs, rhs) => {
+                    let lhs_allocation = self.expr_allocation(*lhs);
+                    let rhs_allocation = self.expr_allocation(*rhs);
+
+                    self.insts_allocations[*inst] = Some(Allocation::Eax);
+
+                    format!(
+                        "{}{}{}  div {}\n",
+                        self.move_(&rhs_allocation, &Allocation::Ebx),
+                        self.move_(&lhs_allocation, &Allocation::Eax),
+                        self.move_(&Allocation::Immediate(0), &Allocation::Edx),
+                        allocation_asm(&Allocation::Ebx),
+                    )
+                }
                 InstData::Call { function, argument } => {
                     let mut inst_asm = "\n".to_string();
                     let (argument_type, return_type) = match self.ssa.blocks[*function] {
