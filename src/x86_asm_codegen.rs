@@ -198,7 +198,18 @@ impl Generator<'_> {
                         allocation_asm(&lhs_allocation),
                     )
                 }
-                InstData::Sub(_lhs, _rhs) => todo!(),
+                InstData::Sub(lhs, rhs) => {
+                    let lhs_allocation = self.expr_allocation(*lhs);
+                    let rhs_allocation = self.expr_allocation(*rhs);
+
+                    self.insts_allocations[*inst] = Some(lhs_allocation);
+
+                    format!(
+                        "  sub {}, {}\n",
+                        allocation_asm(&rhs_allocation),
+                        allocation_asm(&lhs_allocation),
+                    )
+                }
                 InstData::Mul(_lhs, _rhs) => todo!(),
                 InstData::Div(_lhs, _rhs) => todo!(),
                 InstData::Call { function, argument } => {
