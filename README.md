@@ -34,6 +34,7 @@ outputs:
 - `semantic parser`: `source`, `tokens`, `syns` => `sems` (semantic nodes), `types`
 - `type inference`: `sems`, `types` => `sems`, `types`
 - `ssa generation`: `source`, `tokens`, `sems`, `types` => `ssa`, `*types*`
+
 Then the codegen step can be either:
 - `c codegen`: `ssa`, `types` => `c source code`
 - `amd64 codegen`: `ssa`, `types` => `gnu assembly`
