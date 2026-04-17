@@ -29,9 +29,10 @@ pub fn generate(types: &Types, ssa: &Ssa) -> String {
     generator.result()
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Allocation {
     Stack { offset: u64, size: u64 },
+    StackArgument { offset: u64, size: u64 },
     Eax,
     Ebx,
     Ecx,
@@ -94,21 +95,19 @@ impl Generator<'_> {
 
         asm.push_str(&format!("f{}_{name}:\n", function.as_u32()));
 
-        if name == "main" {
-            asm.push_str("  push %rbp\n");
-            asm.push_str("  mov %rsp, %rbp\n\n");
-        }
+        asm.push_str("  push %rbp\n");
+        asm.push_str("  mov %rsp, %rbp\n\n");
 
         let argument_size = self.type_size(*arg);
         self.args_allocations[function] = match argument_size {
             0 => None,
             4 => Some(Allocation::Esi),
             size => {
-                let allocation = Allocation::Stack {
-                    offset: stack_size,
-                    size,
+                let allocation = Allocation::StackArgument {
+                    offset: 0,
+                    size: size,
                 };
-                stack_size += size;
+                // stack_size += size;
                 Some(allocation)
             }
         };
@@ -242,16 +241,15 @@ impl Generator<'_> {
                 InstData::Jump { .. } => todo!(),
                 InstData::JumpCondition { .. } => todo!(),
                 InstData::Return(expr) => {
+                    let mut inst_asm = String::new();
                     if let Some(return_allocation) = return_allocation {
                         let allocation = self.expr_allocation(*expr);
-                        self.move_(&allocation, &return_allocation);
+                        inst_asm.push_str(&self.move_(&allocation, &return_allocation));
                     }
 
-                    if name == "main" {
-                        format!("\n  pop %rbp\n  ret\n")
-                    } else {
-                        format!("  ret\n")
-                    }
+                    inst_asm.push_str("\n  mov %rbp, %rsp\n  pop %rbp\n  ret\n");
+
+                    inst_asm
                 }
             };
 
@@ -401,7 +399,14 @@ impl Generator<'_> {
                 ..
             } => Allocation::Stack {
                 offset: base_offset + offset,
-                size: size,
+                size,
+            },
+            Allocation::StackArgument {
+                offset: base_offset,
+                ..
+            } => Allocation::StackArgument {
+                offset: base_offset + offset,
+                size,
             },
             _ => panic!(),
         }
@@ -433,6 +438,9 @@ impl Generator<'_> {
 fn allocation_asm(allocation: &Allocation) -> Cow<'static, str> {
     match allocation {
         Allocation::Stack { offset, size } => Cow::Owned(format!("-{}(%rbp)", offset + size)),
+        Allocation::StackArgument { offset, size: _ } => {
+            Cow::Owned(format!("{}(%rbp)", offset + 16))
+        }
         Allocation::Eax => Cow::Borrowed("%eax"),
         Allocation::Ebx => Cow::Borrowed("%ebx"),
         Allocation::Ecx => Cow::Borrowed("%ecx"),
@@ -445,7 +453,7 @@ fn allocation_asm(allocation: &Allocation) -> Cow<'static, str> {
 
 fn allocation_size(allocation: &Allocation) -> u64 {
     match allocation {
-        Allocation::Stack { size, .. } => *size,
+        Allocation::Stack { size, .. } | Allocation::StackArgument { size, .. } => *size,
         Allocation::Eax
         | Allocation::Ebx
         | Allocation::Ecx
