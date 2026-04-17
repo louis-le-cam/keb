@@ -202,6 +202,7 @@ impl Generator<'_> {
                 InstData::Mul(_lhs, _rhs) => todo!(),
                 InstData::Div(_lhs, _rhs) => todo!(),
                 InstData::Call { function, argument } => {
+                    let mut inst_asm = "\n".to_string();
                     let (argument_type, return_type) = match self.ssa.blocks[*function] {
                         BlockData::ExternFunction { arg, ret, .. }
                         | BlockData::Function { arg, ret, .. } => (arg, ret),
@@ -213,8 +214,12 @@ impl Generator<'_> {
 
                     if let Some(argument_allocation) = argument_allocation {
                         let allocation = self.expr_allocation(*argument);
-                        self.move_(&allocation, &argument_allocation);
-                    }
+                        inst_asm.push_str(&self.move_(&allocation, &argument_allocation));
+                    };
+
+                    let argument_size = argument_allocation
+                        .map(|allocation| allocation_size(&allocation))
+                        .unwrap_or(0);
 
                     let function_name = match &self.ssa.blocks[*function] {
                         BlockData::ExternFunction { name, .. }
@@ -222,10 +227,9 @@ impl Generator<'_> {
                         BlockData::Block { .. } => panic!(),
                     };
 
-                    let mut inst_asm = String::new();
-                    inst_asm.push_str(&format!("  sub ${stack_size}, %rsp\n"));
+                    inst_asm.push_str(&format!("  sub ${}, %rsp\n", stack_size + argument_size));
                     inst_asm.push_str(&format!("  call f{}_{function_name}\n", function.as_u32()));
-                    inst_asm.push_str(&format!("  add ${stack_size}, %rsp\n"));
+                    inst_asm.push_str(&format!("  add ${}, %rsp\n", stack_size + argument_size));
 
                     if let Some(return_allocation) = return_allocation {
                         let allocation =
@@ -236,6 +240,8 @@ impl Generator<'_> {
                         inst_asm.push_str(&self.move_(&return_allocation, &allocation));
                     }
 
+                    inst_asm.push_str("\n");
+
                     inst_asm
                 }
                 InstData::Jump { .. } => todo!(),
@@ -245,6 +251,10 @@ impl Generator<'_> {
                     if let Some(return_allocation) = return_allocation {
                         let allocation = self.expr_allocation(*expr);
                         inst_asm.push_str(&self.move_(&allocation, &return_allocation));
+                    }
+
+                    if name == "main" {
+                        inst_asm.push_str("\n  mov %edi, %eax");
                     }
 
                     inst_asm.push_str("\n  mov %rbp, %rsp\n  pop %rbp\n  ret\n");
@@ -260,11 +270,27 @@ impl Generator<'_> {
     }
 
     fn move_(&self, source: &Allocation, destination: &Allocation) -> String {
-        format!(
-            "  mov {}, {}\n",
-            allocation_asm(source),
-            allocation_asm(destination)
-        )
+        match allocation_size(destination) {
+            4 => format!(
+                "  movl {}, {}\n",
+                allocation_asm(source),
+                allocation_asm(destination)
+            ),
+            8 => format!(
+                "  movl {}, {}\n  movl {}, {}\n  movl {}, {}\n  movl {}, {}\n",
+                allocation_asm(&self.offset_allocation(*source, 0, 4)),
+                // FIXME: Took a random register to move memory to memory, not
+                // the greatest idea
+                allocation_asm(&Allocation::Esi),
+                allocation_asm(&Allocation::Esi),
+                allocation_asm(&self.offset_allocation(*destination, 0, 4)),
+                allocation_asm(&self.offset_allocation(*source, 4, 4)),
+                allocation_asm(&Allocation::Esi),
+                allocation_asm(&Allocation::Esi),
+                allocation_asm(&self.offset_allocation(*destination, 4, 4)),
+            ),
+            _ => todo!(),
+        }
     }
 
     fn other_function_allocations(
@@ -282,7 +308,7 @@ impl Generator<'_> {
                 4 => Some(Allocation::Esi),
                 size => {
                     let allocation = Allocation::Stack {
-                        offset: stack_size,
+                        offset: stack_size + size,
                         size,
                     };
                     Some(allocation)
@@ -383,7 +409,7 @@ impl Generator<'_> {
             }
             _ => {
                 let allocation = Allocation::Stack {
-                    offset: *stack_size,
+                    offset: size + *stack_size,
                     size,
                 };
                 *stack_size += size;
@@ -398,7 +424,7 @@ impl Generator<'_> {
                 offset: base_offset,
                 ..
             } => Allocation::Stack {
-                offset: base_offset + offset,
+                offset: base_offset - offset,
                 size,
             },
             Allocation::StackArgument {
@@ -437,7 +463,7 @@ impl Generator<'_> {
 
 fn allocation_asm(allocation: &Allocation) -> Cow<'static, str> {
     match allocation {
-        Allocation::Stack { offset, size } => Cow::Owned(format!("-{}(%rbp)", offset + size)),
+        Allocation::Stack { offset, .. } => Cow::Owned(format!("-{}(%rbp)", offset)),
         Allocation::StackArgument { offset, size: _ } => {
             Cow::Owned(format!("{}(%rbp)", offset + 16))
         }
