@@ -33,9 +33,9 @@ outputs:
 - `syntax parser`: `tokens` => `syns` (syntax nodes)
 - `semantic parser`: `source`, `tokens`, `syns` => `sems` (semantic nodes), `types`
 - `type inference`: `sems`, `types` => `sems`, `types`
-- `ssa generation`: `source`, `tokens`, `sems`, `types` => `blocks`, `instructions`, `consts`, `*types*`
+- `ssa generation`: `source`, `tokens`, `sems`, `types` => `ssa`, `*types*`
 Then the codegen step can be either:
-- `c codegen`: `sems`, `types` => `c source code`
-- `amd64 codegen`: `sems`, `types` => `gnu assembly`
+- `c codegen`: `ssa`, `types` => `c source code`
+- `amd64 codegen`: `ssa`, `types` => `gnu assembly`
 
 All theses steps are explicitly written down in `src/main.rs`
