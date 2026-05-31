@@ -355,13 +355,18 @@ impl Generator<'_> {
         };
 
         let return_size = self.type_size(*ret);
-        let return_allocation = match return_size {
-            0 => None,
-            4 => Some(Allocation::Edi),
-            size => Some(Allocation::Stack {
-                offset: argument_stack_size,
-                size,
-            }),
+        let return_allocation = if name == "main" {
+            assert_eq!(return_size, 4);
+            Some(Allocation::Eax)
+        } else {
+            match return_size {
+                0 => None,
+                4 => Some(Allocation::Edi),
+                size => Some(Allocation::Stack {
+                    offset: argument_stack_size,
+                    size,
+                }),
+            }
         };
 
         for inst in insts {
@@ -578,10 +583,6 @@ impl Generator<'_> {
                     if let Some(return_allocation) = return_allocation {
                         let allocation = self.expr_allocation(*expr);
                         inst_asm.push_str(&self.move_(&allocation, &return_allocation));
-                    }
-
-                    if name == "main" {
-                        inst_asm.push_str("\n  mov %edi, %eax");
                     }
 
                     inst_asm.push_str("\n  mov %rbp, %rsp\n  pop %rbp\n  ret\n");
