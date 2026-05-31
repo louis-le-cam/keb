@@ -598,6 +598,10 @@ impl Generator<'_> {
     }
 
     fn move_(&self, source: &Allocation, destination: &Allocation) -> String {
+        if source == destination {
+            return String::new();
+        }
+
         match allocation_size(destination) {
             4 => format!(
                 "  movl {}, {}\n",
