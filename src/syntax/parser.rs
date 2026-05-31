@@ -82,7 +82,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         self.tokens.next();
 
-        let value = self.parse_tuple()?;
+        let value = self.parse_tuple().unwrap();
 
         Some(self.syntax.push(SynData::Assignment { pattern, value }))
     }
@@ -155,7 +155,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         while let Some((_, TokenKind::DoubleEqual)) = self.tokens.peek() {
             self.tokens.next();
-            let rhs = self.parse_additive().unwrap();
+            let rhs = self.parse_comparative().unwrap();
             syn = self.syntax.push(SynData::Equal(syn, rhs))
         }
 
