@@ -721,7 +721,7 @@ impl Generator<'_> {
         };
 
         let Some(TypeSentinel::Unit) = arg.sentinel() else {
-            todo!("implemented block arg");
+            todo!("implement block arg");
         };
 
         let mut asm = String::new();
