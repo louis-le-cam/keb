@@ -399,13 +399,12 @@ impl Generator<'_> {
                     let field_size = self.type_size(field_type);
                     let field_allocation = self.allocate(*inst, field_size);
 
-                    let source_allocation =
-                        self.offset_allocation(allocation, field_offset, field_size);
+                    let source_allocation = allocation.offset(field_offset, field_size);
 
                     self.allocations[*inst].allocation = Some(field_allocation);
                     self.dealloc_if_unused(*inst, *expr);
 
-                    self.move_(&source_allocation, &field_allocation)
+                    source_allocation.move_to(&field_allocation)
                 }
                 InstData::Record(fields, type_) => {
                     let record_size = self.type_size(*type_);
@@ -422,10 +421,9 @@ impl Generator<'_> {
                     for field in fields {
                         let field_allocation = self.expr_allocation(*field);
                         let field_size = self.type_size(self.expr_type(*field));
-                        inst_asm.push_str(&self.move_(
-                            &field_allocation,
-                            &self.offset_allocation(allocation, offset, field_size),
-                        ));
+                        inst_asm.push_str(
+                            &field_allocation.move_to(&allocation.offset(offset, field_size)),
+                        );
 
                         offset += field_size;
                     }
@@ -445,13 +443,13 @@ impl Generator<'_> {
 
                     format!(
                         "{}  cmp {}, {}\n  je i{inst_number}_equal\n  mov {}, {}\n  jmp i{inst_number}_end\ni{inst_number}_equal:\n  mov {}, {}\ni{inst_number}_end:\n\n",
-                        self.move_(&lhs_allocation, &allocation),
-                        allocation_asm(&allocation),
-                        allocation_asm(&rhs_allocation),
-                        allocation_asm(&Allocation::Immediate(0)),
-                        allocation_asm(&allocation),
-                        allocation_asm(&Allocation::Immediate(1)),
-                        allocation_asm(&allocation),
+                        lhs_allocation.move_to(&allocation),
+                        allocation.asm(),
+                        rhs_allocation.asm(),
+                        Allocation::Immediate(0).asm(),
+                        allocation.asm(),
+                        Allocation::Immediate(1).asm(),
+                        allocation.asm(),
                     )
                 }
                 InstData::Add(lhs, rhs) => {
@@ -465,9 +463,9 @@ impl Generator<'_> {
 
                     format!(
                         "{}  add {}, {}\n",
-                        self.move_(&lhs_allocation, &allocation),
-                        allocation_asm(&rhs_allocation),
-                        allocation_asm(&allocation),
+                        lhs_allocation.move_to(&allocation),
+                        rhs_allocation.asm(),
+                        allocation.asm(),
                     )
                 }
                 InstData::Sub(lhs, rhs) => {
@@ -481,9 +479,9 @@ impl Generator<'_> {
 
                     format!(
                         "{}  sub {}, {}\n",
-                        self.move_(&lhs_allocation, &allocation),
-                        allocation_asm(&rhs_allocation),
-                        allocation_asm(&allocation),
+                        lhs_allocation.move_to(&allocation),
+                        rhs_allocation.asm(),
+                        allocation.asm(),
                     )
                 }
                 InstData::Mul(lhs, rhs) => {
@@ -497,8 +495,8 @@ impl Generator<'_> {
 
                     format!(
                         "{}  mul {}\n",
-                        self.move_(&lhs_allocation, &Allocation::Eax),
-                        allocation_asm(&rhs_allocation),
+                        lhs_allocation.move_to(&Allocation::Eax),
+                        rhs_allocation.asm(),
                     )
                 }
                 InstData::Div(lhs, rhs) => {
@@ -512,10 +510,10 @@ impl Generator<'_> {
 
                     format!(
                         "{}{}{}  div {}\n",
-                        self.move_(&rhs_allocation, &Allocation::Ebx),
-                        self.move_(&lhs_allocation, &Allocation::Eax),
-                        self.move_(&Allocation::Immediate(0), &Allocation::Edx),
-                        allocation_asm(&Allocation::Ebx),
+                        rhs_allocation.move_to(&Allocation::Ebx),
+                        lhs_allocation.move_to(&Allocation::Eax),
+                        Allocation::Immediate(0).move_to(&Allocation::Edx),
+                        Allocation::Ebx.asm(),
                     )
                 }
                 InstData::Call { function, argument } => {
@@ -541,11 +539,11 @@ impl Generator<'_> {
 
                     if let Some(argument_allocation) = argument_allocation {
                         let allocation = self.expr_allocation(*argument);
-                        inst_asm.push_str(&self.move_(&allocation, &argument_allocation));
+                        inst_asm.push_str(&allocation.move_to(&argument_allocation));
                     };
 
                     let argument_size = argument_allocation
-                        .map(|allocation| allocation_size(&allocation))
+                        .map(|allocation| allocation.size())
                         .unwrap_or(0);
 
                     let function_name = match &self.ssa.blocks[*function] {
@@ -569,7 +567,7 @@ impl Generator<'_> {
 
                         self.allocations[*inst].allocation = Some(allocation);
 
-                        inst_asm.push_str(&self.move_(&return_allocation, &allocation));
+                        inst_asm.push_str(&return_allocation.move_to(&allocation));
                     }
 
                     inst_asm.push_str("\n");
@@ -582,7 +580,7 @@ impl Generator<'_> {
                     let mut inst_asm = String::new();
                     if let Some(return_allocation) = return_allocation {
                         let allocation = self.expr_allocation(*expr);
-                        inst_asm.push_str(&self.move_(&allocation, &return_allocation));
+                        inst_asm.push_str(&allocation.move_to(&return_allocation));
                     }
 
                     inst_asm.push_str("\n  mov %rbp, %rsp\n  pop %rbp\n  ret\n");
@@ -595,34 +593,6 @@ impl Generator<'_> {
         }
 
         self.blocks[function] = asm;
-    }
-
-    fn move_(&self, source: &Allocation, destination: &Allocation) -> String {
-        if source == destination {
-            return String::new();
-        }
-
-        match allocation_size(destination) {
-            4 => format!(
-                "  movl {}, {}\n",
-                allocation_asm(source),
-                allocation_asm(destination)
-            ),
-            8 => format!(
-                "  movl {}, {}\n  movl {}, {}\n  movl {}, {}\n  movl {}, {}\n",
-                allocation_asm(&self.offset_allocation(*source, 0, 4)),
-                // FIXME: Took a random register to move memory to memory, not
-                // the greatest idea
-                allocation_asm(&Allocation::R8d),
-                allocation_asm(&Allocation::R8d),
-                allocation_asm(&self.offset_allocation(*destination, 0, 4)),
-                allocation_asm(&self.offset_allocation(*source, 4, 4)),
-                allocation_asm(&Allocation::R8d),
-                allocation_asm(&Allocation::R8d),
-                allocation_asm(&self.offset_allocation(*destination, 4, 4)),
-            ),
-            _ => todo!(),
-        }
     }
 
     fn other_function_allocations(
@@ -731,26 +701,6 @@ impl Generator<'_> {
         self.blocks[block] = asm;
     }
 
-    fn offset_allocation(&self, allocation: Allocation, offset: u64, size: u64) -> Allocation {
-        match allocation {
-            Allocation::Stack {
-                offset: base_offset,
-                ..
-            } => Allocation::Stack {
-                offset: base_offset - offset,
-                size,
-            },
-            Allocation::StackArgument {
-                offset: base_offset,
-                ..
-            } => Allocation::StackArgument {
-                offset: base_offset + offset,
-                size,
-            },
-            _ => panic!(),
-        }
-    }
-
     fn type_size(&self, type_: Type) -> u64 {
         match self.types.get(type_) {
             Val::None => panic!(),
@@ -774,33 +724,79 @@ impl Generator<'_> {
     }
 }
 
-fn allocation_asm(allocation: &Allocation) -> Cow<'static, str> {
-    match allocation {
-        Allocation::Stack { offset, .. } => Cow::Owned(format!("-{}(%rbp)", offset)),
-        Allocation::StackArgument { offset, size: _ } => {
-            Cow::Owned(format!("{}(%rbp)", offset + 16))
+impl Allocation {
+    fn asm(&self) -> Cow<'static, str> {
+        match self {
+            Allocation::Stack { offset, .. } => Cow::Owned(format!("-{}(%rbp)", offset)),
+            Allocation::StackArgument { offset, size: _ } => {
+                Cow::Owned(format!("{}(%rbp)", offset + 16))
+            }
+            Allocation::Eax => Cow::Borrowed("%eax"),
+            Allocation::Ebx => Cow::Borrowed("%ebx"),
+            Allocation::Ecx => Cow::Borrowed("%ecx"),
+            Allocation::Edx => Cow::Borrowed("%edx"),
+            Allocation::Esi => Cow::Borrowed("%esi"),
+            Allocation::Edi => Cow::Borrowed("%edi"),
+            Allocation::R8d => Cow::Borrowed("%r8d"),
+            Allocation::Immediate(value) => Cow::Owned(format!("${value}")),
         }
-        Allocation::Eax => Cow::Borrowed("%eax"),
-        Allocation::Ebx => Cow::Borrowed("%ebx"),
-        Allocation::Ecx => Cow::Borrowed("%ecx"),
-        Allocation::Edx => Cow::Borrowed("%edx"),
-        Allocation::Esi => Cow::Borrowed("%esi"),
-        Allocation::Edi => Cow::Borrowed("%edi"),
-        Allocation::R8d => Cow::Borrowed("%r8d"),
-        Allocation::Immediate(value) => Cow::Owned(format!("${value}")),
     }
-}
 
-fn allocation_size(allocation: &Allocation) -> u64 {
-    match allocation {
-        Allocation::Stack { size, .. } | Allocation::StackArgument { size, .. } => *size,
-        Allocation::Eax
-        | Allocation::Ebx
-        | Allocation::Ecx
-        | Allocation::Edx
-        | Allocation::Esi
-        | Allocation::Edi
-        | Allocation::R8d
-        | Allocation::Immediate(_) => 4,
+    fn move_to(&self, destination: &Allocation) -> String {
+        if self == destination {
+            return String::new();
+        }
+
+        match destination.size() {
+            4 => format!("  movl {}, {}\n", self.asm(), destination.asm()),
+            8 => format!(
+                "  movl {}, {}\n  movl {}, {}\n  movl {}, {}\n  movl {}, {}\n",
+                self.offset(0, 4).asm(),
+                // FIXME: Took a random register to move memory to memory, not
+                // the greatest idea
+                Allocation::R8d.asm(),
+                Allocation::R8d.asm(),
+                destination.offset(0, 4).asm(),
+                self.offset(4, 4).asm(),
+                Allocation::R8d.asm(),
+                Allocation::R8d.asm(),
+                destination.offset(4, 4).asm(),
+            ),
+            _ => todo!(),
+        }
+    }
+
+    fn size(&self) -> u64 {
+        match self {
+            Allocation::Stack { size, .. } | Allocation::StackArgument { size, .. } => *size,
+            Allocation::Eax
+            | Allocation::Ebx
+            | Allocation::Ecx
+            | Allocation::Edx
+            | Allocation::Esi
+            | Allocation::Edi
+            | Allocation::R8d
+            | Allocation::Immediate(_) => 4,
+        }
+    }
+
+    fn offset(&self, offset: u64, size: u64) -> Allocation {
+        match self {
+            Allocation::Stack {
+                offset: base_offset,
+                ..
+            } => Allocation::Stack {
+                offset: base_offset - offset,
+                size,
+            },
+            Allocation::StackArgument {
+                offset: base_offset,
+                ..
+            } => Allocation::StackArgument {
+                offset: base_offset + offset,
+                size,
+            },
+            _ => panic!(),
+        }
     }
 }
