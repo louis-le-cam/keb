@@ -31,7 +31,7 @@ pub fn generate(types: &Types, ssa: &Ssa) -> String {
     generator.result()
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Allocation {
     Stack { offset: u64, size: u64 },
     StackArgument { offset: u64, size: u64 },
@@ -95,33 +95,6 @@ impl Generator<'_> {
             .0
     }
 
-    fn block_function(&self, block: Block) -> Block {
-        if let BlockData::Function { .. } = &self.ssa.blocks[block] {
-            return block;
-        }
-
-        let mut visited_blocks = HashSet::new();
-
-        let mut blocks = Vec::from([block]);
-
-        while let Some(block) = blocks.pop() {
-            visited_blocks.insert(block);
-
-            match self.ssa.blocks[block] {
-                BlockData::ExternFunction { .. } => unreachable!(),
-                BlockData::Function { .. } => return block,
-                BlockData::Block { .. } => {}
-            }
-
-            blocks.extend(
-                self.block_parents(block)
-                    .filter(|block| !visited_blocks.contains(block)),
-            );
-        }
-
-        panic!()
-    }
-
     fn block_children(&self, block: Block) -> impl Iterator<Item = Block> {
         let children = match &self.ssa.blocks[block] {
             BlockData::ExternFunction { .. } => [None, None],
@@ -141,30 +114,55 @@ impl Generator<'_> {
         children.into_iter().filter_map(|block| block)
     }
 
-    fn block_parents(&self, block: Block) -> impl Iterator<Item = Block> {
+    fn block_descendants(&self, block: Block) -> impl Iterator<Item = Block> {
+        let mut blocks = Vec::from([block]);
+        let mut visited = HashSet::new();
+
+        while let Some(child) = blocks.pop() {
+            visited.insert(child);
+
+            blocks.extend(
+                self.block_children(child)
+                    .filter(|descendant| visited.contains(descendant)),
+            );
+        }
+
+        visited.remove(&block);
+        visited.into_iter()
+    }
+
+    fn block_parent_instructions(&self, block: Block) -> impl Iterator<Item = Inst> {
         self.ssa
-            .blocks
+            .insts
             .entries()
-            .filter(move |(parent, _)| self.block_children(*parent).any(|child| child == block))
-            .map(|(block, _)| block)
+            .filter(move |(_, inst_data)| match inst_data {
+                InstData::Jump {
+                    block: destination, ..
+                } => *destination == block,
+                InstData::JumpCondition { then, else_, .. } => *then == block || *else_ == block,
+                _ => false,
+            })
+            .map(|(inst, _)| inst)
     }
 
     fn used_allocations(&self, inst: Inst) -> Vec<Allocation> {
         let block = self.inst_block(inst);
-        let function = self.block_function(block);
-        assert_eq!(
-            block, function,
-            "TODO: Support branching in the allocation process"
-        );
 
-        let function_insts = match &self.ssa.blocks[function] {
-            BlockData::Function { insts, .. } => insts,
-            BlockData::ExternFunction { .. } | BlockData::Block { .. } => unreachable!(),
+        let insts = match &self.ssa.blocks[block] {
+            BlockData::Function { insts, .. } | BlockData::Block { insts, .. } => insts,
+            BlockData::ExternFunction { .. } => unreachable!(),
         };
 
-        let mut allocations = Vec::<Allocation>::new();
+        let mut allocations = self
+            .block_parent_instructions(block)
+            .fold(HashSet::new(), |mut set, parent_inst| {
+                set.extend(self.used_allocations(parent_inst));
+                set
+            })
+            .into_iter()
+            .collect::<Vec<_>>();
 
-        for inst in function_insts {
+        for inst in insts {
             let inst_allocations = &self.allocations[*inst];
 
             for inst in &inst_allocations.deallocations {
@@ -202,27 +200,27 @@ impl Generator<'_> {
 
     fn inst_used_after(&self, inst: Inst, after: Inst) -> bool {
         let block = self.inst_block(inst);
-        let function = self.block_function(block);
-        assert_eq!(
-            block, function,
-            "TODO: Support branching in the allocation process"
-        );
 
-        let BlockData::Function {
-            name: _,
-            arg: _,
-            ret: _,
-            insts,
-        } = &self.ssa.blocks[function]
-        else {
-            unreachable!()
+        let insts = match &self.ssa.blocks[block] {
+            BlockData::ExternFunction { .. } => panic!(),
+            BlockData::Function { insts, .. } | BlockData::Block { insts, .. } => insts,
         };
 
         !insts
             .iter()
             .skip_while(|fn_inst| **fn_inst != after)
             .skip(1)
-            .any(|fn_inst| self.instruction_usages(*fn_inst).any(|usage| usage == inst))
+            .chain(
+                self.block_descendants(block)
+                    .flat_map(|block| match &self.ssa.blocks[block] {
+                        BlockData::ExternFunction { .. } => panic!(),
+                        BlockData::Function { insts, .. } | BlockData::Block { insts, .. } => insts,
+                    }),
+            )
+            .any(|other_inst| {
+                self.instruction_usages(*other_inst)
+                    .any(|usage| usage == inst)
+            })
     }
 
     fn dealloc_if_unused(&mut self, at: Inst, expr: Expr) {
@@ -370,229 +368,264 @@ impl Generator<'_> {
         };
 
         for inst in insts {
-            let inst_asm = match &self.ssa.insts[*inst] {
-                InstData::Field(expr, field) => {
-                    let allocation = self.expr_allocation(*expr);
-
-                    let expr_type = self.expr_type(*expr);
-
-                    let field_offset = match self.types.get(expr_type) {
-                        Val::None => panic!(),
-                        Val::Sentinel(_) => panic!(),
-                        Val::Value(type_data) => match type_data {
-                            TypeData::Function { .. } => panic!(),
-                            TypeData::Product { fields } => fields[0..*field as usize]
-                                .iter()
-                                .fold(0, |acc, (_, field_type)| acc + self.type_size(*field_type)),
-                        },
-                    };
-
-                    let field_type = match self.types.get(expr_type) {
-                        Val::None => panic!(),
-                        Val::Sentinel(_) => panic!(),
-                        Val::Value(type_data) => match type_data {
-                            TypeData::Function { .. } => panic!(),
-                            TypeData::Product { fields } => fields[*field as usize].1,
-                        },
-                    };
-
-                    let field_size = self.type_size(field_type);
-                    let field_allocation = self.allocate(*inst, field_size);
-
-                    let source_allocation = allocation.offset(field_offset, field_size);
-
-                    self.allocations[*inst].allocation = Some(field_allocation);
-                    self.dealloc_if_unused(*inst, *expr);
-
-                    source_allocation.move_to(&field_allocation)
-                }
-                InstData::Record(fields, type_) => {
-                    let record_size = self.type_size(*type_);
-
-                    let allocation = self.allocate(*inst, record_size);
-                    self.allocations[*inst].allocation = Some(allocation);
-                    for field in fields {
-                        self.dealloc_if_unused(*inst, *field);
-                    }
-
-                    let mut inst_asm = String::new();
-
-                    let mut offset = 0;
-                    for field in fields {
-                        let field_allocation = self.expr_allocation(*field);
-                        let field_size = self.type_size(self.expr_type(*field));
-                        inst_asm.push_str(
-                            &field_allocation.move_to(&allocation.offset(offset, field_size)),
-                        );
-
-                        offset += field_size;
-                    }
-
-                    inst_asm
-                }
-                InstData::Equal(lhs, rhs) => {
-                    let lhs_allocation = self.expr_allocation(*lhs);
-                    let rhs_allocation = self.expr_allocation(*rhs);
-
-                    let allocation = self.allocate(*inst, 4);
-                    self.allocations[*inst].allocation = Some(allocation);
-                    self.dealloc_if_unused(*inst, *lhs);
-                    self.dealloc_if_unused(*inst, *rhs);
-
-                    let inst_number = inst.as_u32();
-
-                    format!(
-                        "{}  cmp {}, {}\n  je i{inst_number}_equal\n  mov {}, {}\n  jmp i{inst_number}_end\ni{inst_number}_equal:\n  mov {}, {}\ni{inst_number}_end:\n\n",
-                        lhs_allocation.move_to(&allocation),
-                        allocation.asm(),
-                        rhs_allocation.asm(),
-                        Allocation::Immediate(0).asm(),
-                        allocation.asm(),
-                        Allocation::Immediate(1).asm(),
-                        allocation.asm(),
-                    )
-                }
-                InstData::Add(lhs, rhs) => {
-                    let lhs_allocation = self.expr_allocation(*lhs);
-                    let rhs_allocation = self.expr_allocation(*rhs);
-
-                    let allocation = self.allocate(*inst, 4);
-                    self.allocations[*inst].allocation = Some(allocation);
-                    self.dealloc_if_unused(*inst, *lhs);
-                    self.dealloc_if_unused(*inst, *rhs);
-
-                    format!(
-                        "{}  add {}, {}\n",
-                        lhs_allocation.move_to(&allocation),
-                        rhs_allocation.asm(),
-                        allocation.asm(),
-                    )
-                }
-                InstData::Sub(lhs, rhs) => {
-                    let lhs_allocation = self.expr_allocation(*lhs);
-                    let rhs_allocation = self.expr_allocation(*rhs);
-
-                    let allocation = self.allocate(*inst, 4);
-                    self.allocations[*inst].allocation = Some(allocation);
-                    self.dealloc_if_unused(*inst, *lhs);
-                    self.dealloc_if_unused(*inst, *rhs);
-
-                    format!(
-                        "{}  sub {}, {}\n",
-                        lhs_allocation.move_to(&allocation),
-                        rhs_allocation.asm(),
-                        allocation.asm(),
-                    )
-                }
-                InstData::Mul(lhs, rhs) => {
-                    let lhs_allocation = self.expr_allocation(*lhs);
-                    let rhs_allocation = self.expr_allocation(*rhs);
-
-                    // TODO: Do proper allocation
-                    self.allocations[*inst].allocation = Some(Allocation::Eax);
-                    self.dealloc_if_unused(*inst, *lhs);
-                    self.dealloc_if_unused(*inst, *rhs);
-
-                    format!(
-                        "{}  mul {}\n",
-                        lhs_allocation.move_to(&Allocation::Eax),
-                        rhs_allocation.asm(),
-                    )
-                }
-                InstData::Div(lhs, rhs) => {
-                    let lhs_allocation = self.expr_allocation(*lhs);
-                    let rhs_allocation = self.expr_allocation(*rhs);
-
-                    // TODO: Do proper allocation
-                    self.allocations[*inst].allocation = Some(Allocation::Eax);
-                    self.dealloc_if_unused(*inst, *lhs);
-                    self.dealloc_if_unused(*inst, *rhs);
-
-                    format!(
-                        "{}{}{}  div {}\n",
-                        rhs_allocation.move_to(&Allocation::Ebx),
-                        lhs_allocation.move_to(&Allocation::Eax),
-                        Allocation::Immediate(0).move_to(&Allocation::Edx),
-                        Allocation::Ebx.asm(),
-                    )
-                }
-                InstData::Call { function, argument } => {
-                    let mut inst_asm = "\n".to_string();
-
-                    let used_allocations = self.used_allocations(*inst);
-                    let stack_size = self.stack_bottom(&used_allocations);
-
-                    inst_asm.push_str(&format!("  sub ${}, %rsp\n", stack_size));
-                    inst_asm.push_str("  push %rax\n");
-                    inst_asm.push_str("  push %rbx\n");
-                    inst_asm.push_str("  push %rcx\n");
-                    inst_asm.push_str("  push %rdx\n");
-
-                    let (argument_type, return_type) = match self.ssa.blocks[*function] {
-                        BlockData::ExternFunction { arg, ret, .. }
-                        | BlockData::Function { arg, ret, .. } => (arg, ret),
-                        BlockData::Block { .. } => panic!(),
-                    };
-
-                    let (argument_allocation, return_allocation) =
-                        self.other_function_allocations(argument_type, return_type, stack_size);
-
-                    if let Some(argument_allocation) = argument_allocation {
-                        let allocation = self.expr_allocation(*argument);
-                        inst_asm.push_str(&allocation.move_to(&argument_allocation));
-                    };
-
-                    let argument_size = argument_allocation
-                        .map(|allocation| allocation.size())
-                        .unwrap_or(0);
-
-                    let function_name = match &self.ssa.blocks[*function] {
-                        BlockData::ExternFunction { name, .. }
-                        | BlockData::Function { name, .. } => name,
-                        BlockData::Block { .. } => panic!(),
-                    };
-
-                    inst_asm.push_str(&format!("  sub ${}, %rsp\n", argument_size));
-                    inst_asm.push_str(&format!("  call f{}_{function_name}\n", function.as_u32()));
-                    inst_asm.push_str(&format!("  add ${}, %rsp\n", argument_size));
-
-                    inst_asm.push_str("  pop %rdx\n");
-                    inst_asm.push_str("  pop %rcx\n");
-                    inst_asm.push_str("  pop %rbx\n");
-                    inst_asm.push_str("  pop %rax\n");
-                    inst_asm.push_str(&format!("  add ${}, %rsp\n", stack_size));
-
-                    if let Some(return_allocation) = return_allocation {
-                        let allocation = self.allocate(*inst, self.type_size(return_type));
-
-                        self.allocations[*inst].allocation = Some(allocation);
-
-                        inst_asm.push_str(&return_allocation.move_to(&allocation));
-                    }
-
-                    inst_asm.push_str("\n");
-
-                    inst_asm
-                }
-                InstData::Jump { .. } => todo!(),
-                InstData::JumpCondition { .. } => todo!(),
-                InstData::Return(expr) => {
-                    let mut inst_asm = String::new();
-                    if let Some(return_allocation) = return_allocation {
-                        let allocation = self.expr_allocation(*expr);
-                        inst_asm.push_str(&allocation.move_to(&return_allocation));
-                    }
-
-                    inst_asm.push_str("\n  mov %rbp, %rsp\n  pop %rbp\n  ret\n");
-
-                    inst_asm
-                }
-            };
-
-            asm.push_str(&inst_asm);
+            asm.push_str(&self.inst_asm(*inst, return_allocation));
         }
 
         self.blocks[function] = asm;
+    }
+
+    fn inst_asm(&mut self, inst: Inst, return_allocation: Option<Allocation>) -> String {
+        match &self.ssa.insts[inst] {
+            InstData::Field(expr, field) => {
+                let allocation = self.expr_allocation(*expr);
+
+                let expr_type = self.expr_type(*expr);
+
+                let field_offset = match self.types.get(expr_type) {
+                    Val::None => panic!(),
+                    Val::Sentinel(_) => panic!(),
+                    Val::Value(type_data) => match type_data {
+                        TypeData::Function { .. } => panic!(),
+                        TypeData::Product { fields } => fields[0..*field as usize]
+                            .iter()
+                            .fold(0, |acc, (_, field_type)| acc + self.type_size(*field_type)),
+                    },
+                };
+
+                let field_type = match self.types.get(expr_type) {
+                    Val::None => panic!(),
+                    Val::Sentinel(_) => panic!(),
+                    Val::Value(type_data) => match type_data {
+                        TypeData::Function { .. } => panic!(),
+                        TypeData::Product { fields } => fields[*field as usize].1,
+                    },
+                };
+
+                let field_size = self.type_size(field_type);
+                let field_allocation = self.allocate(inst, field_size);
+
+                let source_allocation = allocation.offset(field_offset, field_size);
+
+                self.allocations[inst].allocation = Some(field_allocation);
+                self.dealloc_if_unused(inst, *expr);
+
+                source_allocation.move_to(&field_allocation)
+            }
+            InstData::Record(fields, type_) => {
+                let record_size = self.type_size(*type_);
+
+                let allocation = self.allocate(inst, record_size);
+                self.allocations[inst].allocation = Some(allocation);
+                for field in fields {
+                    self.dealloc_if_unused(inst, *field);
+                }
+
+                let mut inst_asm = String::new();
+
+                let mut offset = 0;
+                for field in fields {
+                    let field_allocation = self.expr_allocation(*field);
+                    let field_size = self.type_size(self.expr_type(*field));
+                    inst_asm.push_str(
+                        &field_allocation.move_to(&allocation.offset(offset, field_size)),
+                    );
+
+                    offset += field_size;
+                }
+
+                inst_asm
+            }
+            InstData::Equal(lhs, rhs) => {
+                let lhs_allocation = self.expr_allocation(*lhs);
+                let rhs_allocation = self.expr_allocation(*rhs);
+
+                let allocation = self.allocate(inst, 4);
+                self.allocations[inst].allocation = Some(allocation);
+                self.dealloc_if_unused(inst, *lhs);
+                self.dealloc_if_unused(inst, *rhs);
+
+                let inst_number = inst.as_u32();
+
+                format!(
+                    "{}  cmp {}, {}\n  je i{inst_number}_equal\n  mov {}, {}\n  jmp i{inst_number}_end\ni{inst_number}_equal:\n  mov {}, {}\ni{inst_number}_end:\n\n",
+                    lhs_allocation.move_to(&allocation),
+                    allocation.asm(),
+                    rhs_allocation.asm(),
+                    Allocation::Immediate(0).asm(),
+                    allocation.asm(),
+                    Allocation::Immediate(1).asm(),
+                    allocation.asm(),
+                )
+            }
+            InstData::Add(lhs, rhs) => {
+                let lhs_allocation = self.expr_allocation(*lhs);
+                let rhs_allocation = self.expr_allocation(*rhs);
+
+                let allocation = self.allocate(inst, 4);
+                self.allocations[inst].allocation = Some(allocation);
+                self.dealloc_if_unused(inst, *lhs);
+                self.dealloc_if_unused(inst, *rhs);
+
+                format!(
+                    "{}  add {}, {}\n",
+                    lhs_allocation.move_to(&allocation),
+                    rhs_allocation.asm(),
+                    allocation.asm(),
+                )
+            }
+            InstData::Sub(lhs, rhs) => {
+                let lhs_allocation = self.expr_allocation(*lhs);
+                let rhs_allocation = self.expr_allocation(*rhs);
+
+                let allocation = self.allocate(inst, 4);
+                self.allocations[inst].allocation = Some(allocation);
+                self.dealloc_if_unused(inst, *lhs);
+                self.dealloc_if_unused(inst, *rhs);
+
+                format!(
+                    "{}  sub {}, {}\n",
+                    lhs_allocation.move_to(&allocation),
+                    rhs_allocation.asm(),
+                    allocation.asm(),
+                )
+            }
+            InstData::Mul(lhs, rhs) => {
+                let lhs_allocation = self.expr_allocation(*lhs);
+                let rhs_allocation = self.expr_allocation(*rhs);
+
+                // TODO: Do proper allocation
+                self.allocations[inst].allocation = Some(Allocation::Eax);
+                self.dealloc_if_unused(inst, *lhs);
+                self.dealloc_if_unused(inst, *rhs);
+
+                format!(
+                    "{}  mul {}\n",
+                    lhs_allocation.move_to(&Allocation::Eax),
+                    rhs_allocation.asm(),
+                )
+            }
+            InstData::Div(lhs, rhs) => {
+                let lhs_allocation = self.expr_allocation(*lhs);
+                let rhs_allocation = self.expr_allocation(*rhs);
+
+                // TODO: Do proper allocation
+                self.allocations[inst].allocation = Some(Allocation::Eax);
+                self.dealloc_if_unused(inst, *lhs);
+                self.dealloc_if_unused(inst, *rhs);
+
+                format!(
+                    "{}{}{}  div {}\n",
+                    rhs_allocation.move_to(&Allocation::Ebx),
+                    lhs_allocation.move_to(&Allocation::Eax),
+                    Allocation::Immediate(0).move_to(&Allocation::Edx),
+                    Allocation::Ebx.asm(),
+                )
+            }
+            InstData::Call { function, argument } => {
+                let mut inst_asm = "\n".to_string();
+
+                let used_allocations = self.used_allocations(inst);
+                let stack_size = self.stack_bottom(&used_allocations);
+
+                inst_asm.push_str(&format!("  sub ${}, %rsp\n", stack_size));
+                inst_asm.push_str("  push %rax\n");
+                inst_asm.push_str("  push %rbx\n");
+                inst_asm.push_str("  push %rcx\n");
+                inst_asm.push_str("  push %rdx\n");
+
+                let (argument_type, return_type) = match self.ssa.blocks[*function] {
+                    BlockData::ExternFunction { arg, ret, .. }
+                    | BlockData::Function { arg, ret, .. } => (arg, ret),
+                    BlockData::Block { .. } => panic!(),
+                };
+
+                let (argument_allocation, return_allocation) =
+                    self.other_function_allocations(argument_type, return_type, stack_size);
+
+                if let Some(argument_allocation) = argument_allocation {
+                    let allocation = self.expr_allocation(*argument);
+                    inst_asm.push_str(&allocation.move_to(&argument_allocation));
+                };
+
+                let argument_size = argument_allocation
+                    .map(|allocation| allocation.size())
+                    .unwrap_or(0);
+
+                let function_name = match &self.ssa.blocks[*function] {
+                    BlockData::ExternFunction { name, .. } | BlockData::Function { name, .. } => {
+                        name
+                    }
+                    BlockData::Block { .. } => panic!(),
+                };
+
+                inst_asm.push_str(&format!("  sub ${}, %rsp\n", argument_size));
+                inst_asm.push_str(&format!("  call f{}_{function_name}\n", function.as_u32()));
+                inst_asm.push_str(&format!("  add ${}, %rsp\n", argument_size));
+
+                inst_asm.push_str("  pop %rdx\n");
+                inst_asm.push_str("  pop %rcx\n");
+                inst_asm.push_str("  pop %rbx\n");
+                inst_asm.push_str("  pop %rax\n");
+                inst_asm.push_str(&format!("  add ${}, %rsp\n", stack_size));
+
+                if let Some(return_allocation) = return_allocation {
+                    let allocation = self.allocate(inst, self.type_size(return_type));
+
+                    self.allocations[inst].allocation = Some(allocation);
+
+                    inst_asm.push_str(&return_allocation.move_to(&allocation));
+                }
+
+                inst_asm.push_str("\n");
+
+                inst_asm
+            }
+            InstData::Jump { block, argument } => {
+                let argument_size = self.type_size(self.expr_type(*argument));
+
+                assert!(
+                    self.args_allocations[*block].is_none(),
+                    "TODO: Implement multiple places jumping to the same block"
+                );
+                let used_allocations = self.used_allocations(inst);
+                let stack_bottom = self.stack_bottom(&used_allocations);
+                let allocation = Allocation::Stack {
+                    offset: stack_bottom + argument_size,
+                    size: argument_size,
+                };
+                self.args_allocations[*block] = Some(allocation);
+
+                format!(
+                    "{}  jmp b{}\n",
+                    self.expr_allocation(*argument).move_to(&allocation),
+                    block.as_u32()
+                )
+            }
+            InstData::JumpCondition {
+                condition,
+                then,
+                else_,
+            } => {
+                let condition_asm = self.expr_allocation(*condition).asm();
+
+                format!(
+                    "  cmp $0, {condition_asm}\n  jne b{}\n  jmp b{}",
+                    then.as_u32(),
+                    else_.as_u32(),
+                )
+            }
+            InstData::Return(expr) => {
+                let mut inst_asm = String::new();
+                if let Some(return_allocation) = return_allocation {
+                    let allocation = self.expr_allocation(*expr);
+                    inst_asm.push_str(&allocation.move_to(&return_allocation));
+                }
+
+                inst_asm.push_str("\n  mov %rbp, %rsp\n  pop %rbp\n  ret\n");
+
+                inst_asm
+            }
+        }
     }
 
     fn other_function_allocations(
@@ -686,17 +719,17 @@ impl Generator<'_> {
     }
 
     fn generate_block(&mut self, block: Block) {
-        let BlockData::Block { arg, insts: _ } = &self.ssa.blocks[block] else {
+        let BlockData::Block { insts, .. } = &self.ssa.blocks[block] else {
             panic!()
-        };
-
-        let Some(TypeSentinel::Unit) = arg.sentinel() else {
-            todo!("implement block arg");
         };
 
         let mut asm = String::new();
 
         asm.push_str(&format!("b{}:\n", block.as_u32()));
+
+        for inst in insts {
+            asm.push_str(&self.inst_asm(*inst, None));
+        }
 
         self.blocks[block] = asm;
     }
