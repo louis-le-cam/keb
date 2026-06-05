@@ -140,7 +140,7 @@ impl Type {
                     TypeSentinel::True => "true",
                 };
 
-                write!(f, "{}", text.bright_blue().to_string())
+                write!(f, "{}", text.bright_blue())
             }
             Val::Value(type_data) => match type_data {
                 TypeData::Function {

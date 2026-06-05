@@ -198,17 +198,13 @@ impl Expr {
                         ConstSentinel::False => "false",
                         ConstSentinel::True => "true",
                     },
-                    None => &format!("${}", const_.as_u32()).to_string(),
+                    None => &format!("${}", const_.as_u32()),
                 };
 
-                write!(f, "{}", text.bright_magenta().to_string())
+                write!(f, "{}", text.bright_magenta())
             }
             Expr::Inst(inst) => inst.fmt(f),
-            Expr::BlockArg(block) => write!(
-                f,
-                "{}",
-                format!("param({block})").bright_yellow().to_string()
-            ),
+            Expr::BlockArg(block) => write!(f, "{}", format!("param({block})").bright_yellow()),
         })
     }
 }
