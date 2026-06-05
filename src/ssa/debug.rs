@@ -122,7 +122,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                     print!("{} {}", "return".bright_red().bold(), debug_expr(value))
                 }
             }
-            println!("{}", ";".white());
+            println!();
         }
 
         println!()
@@ -144,7 +144,7 @@ pub fn debug(types: &Types, ssa: &Ssa) {
                 print!(")");
             }
         }
-        println!("{}", ";".white());
+        println!();
     }
 }
 
