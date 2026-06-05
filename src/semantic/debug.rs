@@ -127,8 +127,8 @@ impl Debug for DebugSem<'_> {
                 .finish(),
         }?;
 
-        f.write_str(&": ".white().to_string())?;
-        f.write_str(&debug_type(self.types, self.semantic.types[self.sem]))
+        write!(f, "{}", ": ".white().to_string())?;
+        write!(f, "{}", self.semantic.types[self.sem].debug(&self.types))
     }
 }
 
@@ -140,46 +140,46 @@ impl<T: Display> Debug for DebugUsingDisplay<T> {
     }
 }
 
-pub fn debug_type(types: &Types, type_: Type) -> String {
-    match types.get(type_) {
-        Val::None => panic!(),
-        Val::Sentinel(sentinel) => {
-            let text = match sentinel {
-                TypeSentinel::Unknown => "unknown",
-                TypeSentinel::Unit => "()",
-                TypeSentinel::Uint32 => "u32",
-                TypeSentinel::Bool => "bool",
-                TypeSentinel::False => "false",
-                TypeSentinel::True => "true",
-            };
+impl Type {
+    pub fn debug(self, types: &Types) -> impl Display {
+        std::fmt::from_fn(move |f| match types.get(self) {
+            Val::None => panic!(),
+            Val::Sentinel(sentinel) => {
+                let text = match sentinel {
+                    TypeSentinel::Unknown => "unknown",
+                    TypeSentinel::Unit => "()",
+                    TypeSentinel::Uint32 => "u32",
+                    TypeSentinel::Bool => "bool",
+                    TypeSentinel::False => "false",
+                    TypeSentinel::True => "true",
+                };
 
-            text.bright_blue().to_string()
-        }
-        Val::Value(type_data) => match type_data {
-            TypeData::Function {
-                argument_type,
-                return_type,
-            } => {
-                let mut text = debug_type(types, *argument_type);
-                text.push_str(" -> ");
-                text.push_str(&debug_type(types, *return_type));
-                text
+                write!(f, "{}", text.bright_blue().to_string())
             }
-            TypeData::Product { fields } => {
-                let mut text = "(".to_string();
+            Val::Value(type_data) => match type_data {
+                TypeData::Function {
+                    argument_type,
+                    return_type,
+                } => write!(
+                    f,
+                    "{} -> {}",
+                    argument_type.debug(types),
+                    return_type.debug(types)
+                ),
+                TypeData::Product { fields } => {
+                    write!(f, "(")?;
 
-                for (i, (_, field)) in fields.iter().enumerate() {
-                    if i != 0 {
-                        text.push_str(", ");
+                    for (i, (_, field)) in fields.iter().enumerate() {
+                        if i != 0 {
+                            write!(f, ", ")?;
+                        }
+
+                        write!(f, "{}", field.debug(types))?;
                     }
 
-                    text.push_str(&debug_type(types, *field));
+                    write!(f, ")")
                 }
-
-                text.push(')');
-
-                text
-            }
-        },
+            },
+        })
     }
 }

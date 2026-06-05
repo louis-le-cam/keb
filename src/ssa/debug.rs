@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use colored::Colorize as _;
 
-use crate::semantic::{Types, debug_type};
+use crate::semantic::Types;
 
 use super::*;
 
@@ -141,8 +141,8 @@ impl Block {
                 "{self} {} {} {} -> {}",
                 "extern".bright_red().bold(),
                 name.bright_yellow(),
-                debug_type(types, *arg),
-                debug_type(types, *ret),
+                arg.debug(types),
+                ret.debug(types),
             ),
             BlockData::Function {
                 name,
@@ -153,11 +153,11 @@ impl Block {
                 f,
                 "{self} {} {} -> {}",
                 name.bright_yellow(),
-                debug_type(types, *arg),
-                debug_type(types, *ret),
+                arg.debug(types),
+                ret.debug(types),
             ),
             BlockData::Block { arg, insts: _ } => {
-                write!(f, "{self} {}", debug_type(types, *arg))
+                write!(f, "{self} {}", arg.debug(types))
             }
         })
     }
