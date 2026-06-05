@@ -1,5 +1,6 @@
 #![feature(macro_derive)]
 
+pub mod amd64_allocation;
 pub mod amd64_asm_codegen;
 pub mod c_codegen;
 pub mod diagnotic;

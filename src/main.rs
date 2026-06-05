@@ -2,7 +2,7 @@ use std::{process::Command, time::Instant};
 
 use colored::Colorize;
 use keb::{
-    amd64_asm_codegen, c_codegen,
+    amd64_allocation, amd64_asm_codegen, c_codegen,
     semantic::{self, Types},
     ssa::{self, Ssa},
     syntax, token,
@@ -63,7 +63,14 @@ fn run_ssa_with_c_codegen(types: &Types, ssa: &Ssa) {
 }
 
 fn run_ssa_with_amd64_asm_codegen(types: &Types, ssa: &Ssa) {
-    let asm = amd64_asm_codegen::generate(&types, &ssa);
+    let start = Instant::now();
+    let allocations = amd64_allocation::allocate(&types, &ssa);
+    debug_header_duration("AMD64 REGISTER ALLOCATION", start);
+
+    let start = Instant::now();
+    let asm = amd64_asm_codegen::generate(&types, &ssa, &allocations);
+    debug_header_duration("AMD64 CODEGEN", start);
+
     std::fs::write("output.s", asm).unwrap();
 
     debug_header("GCC");
