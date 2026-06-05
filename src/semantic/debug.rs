@@ -8,136 +8,122 @@ use crate::{
 };
 
 pub fn debug(semantic: &Semantic, types: &Types) {
-    println!(
-        "{:#?}",
-        DebugSem {
-            semantic,
-            types,
-            sem: ROOT_SEM
-        }
-    );
+    println!("{:#?}", ROOT_SEM.debug(semantic, types));
 }
 
-struct DebugSem<'a> {
-    semantic: &'a Semantic,
-    types: &'a Types,
-    sem: Sem,
-}
+impl Sem {
+    pub fn debug(self, semantic: &Semantic, types: &Types) -> impl Debug {
+        std::fmt::from_fn(move |f| {
+            match &semantic.kinds[self] {
+                SemKind::Number(_) => f.debug_tuple(&"number".bright_green().to_string()).finish(),
+                SemKind::False(_) => f.debug_tuple(&"false".bright_green().to_string()).finish(),
+                SemKind::True(_) => f.debug_tuple(&"true".bright_green().to_string()).finish(),
+                SemKind::Module { bindings } => bindings
+                    .iter()
+                    .fold(
+                        &mut f.debug_struct(&"module".bright_green().to_string()),
+                        |structure, (name, value)| {
+                            structure.field(
+                                &name.bright_cyan().to_string(),
+                                &value.debug(semantic, types),
+                            )
+                        },
+                    )
+                    .finish(),
+                SemKind::Function { argument, body } => f
+                    .debug_tuple(&"function".bright_green().to_string())
+                    .field(&debug_with_display(argument.bright_cyan()))
+                    .field(&body.debug(semantic, types))
+                    .finish(),
+                SemKind::Binding { name, value, body } => f
+                    .debug_tuple(&"binding".bright_green().to_string())
+                    .field(&debug_with_display(name.bright_cyan()))
+                    .field(&value.debug(semantic, types))
+                    .field(&body.debug(semantic, types))
+                    .finish(),
+                SemKind::MutBinding { name, value, body } => f
+                    .debug_tuple(&"mut_binding".bright_green().to_string())
+                    .field(&debug_with_display(name.bright_cyan()))
+                    .field(&value.debug(semantic, types))
+                    .field(&body.debug(semantic, types))
+                    .finish(),
+                SemKind::Assignment { binding, value } => f
+                    .debug_tuple(&"assignment".bright_green().to_string())
+                    .field(&debug_with_display(binding.bright_cyan()))
+                    .field(&value.debug(semantic, types))
+                    .finish(),
+                SemKind::Reference { name } => {
+                    write!(f, "{}({})", "reference".bright_green(), name.bright_cyan())
+                }
+                SemKind::Access { field, expr } => f
+                    .debug_tuple(&"access".bright_green().to_string())
+                    .field(&debug_with_display(field.bright_cyan()))
+                    .field(&expr.debug(semantic, types))
+                    .finish(),
+                SemKind::Application { function, argument } => f
+                    .debug_tuple(&"application".bright_green().to_string())
+                    .field(&function.debug(semantic, types))
+                    .field(&argument.debug(semantic, types))
+                    .finish(),
+                SemKind::Loop(body) => f
+                    .debug_tuple(&"loop".bright_green().to_string())
+                    .field(&body.debug(semantic, types))
+                    .finish(),
+                SemKind::If { condition, then } => f
+                    .debug_tuple(&"if".bright_green().to_string())
+                    .field(&condition.debug(semantic, types))
+                    .field(&then.debug(semantic, types))
+                    .finish(),
+                SemKind::IfElse {
+                    condition,
+                    then,
+                    else_,
+                } => f
+                    .debug_tuple(&"if".bright_green().to_string())
+                    .field(&condition.debug(semantic, types))
+                    .field(&then.debug(semantic, types))
+                    .field(&else_.debug(semantic, types))
+                    .finish(),
+                SemKind::BuildStruct { fields } => fields
+                    .iter()
+                    .fold(
+                        &mut f.debug_struct(&"build_struct".bright_green().to_string()),
+                        |structure, (name, value)| {
+                            structure.field(
+                                &name.bright_cyan().to_string(),
+                                &value.debug(semantic, types),
+                            )
+                        },
+                    )
+                    .finish(),
+                SemKind::ChainOpen {
+                    statements,
+                    expression,
+                } => statements
+                    .iter()
+                    .chain([expression])
+                    .fold(
+                        &mut f.debug_tuple(&"chain_open".bright_green().to_string()),
+                        |structure, expression| structure.field(&expression.debug(semantic, types)),
+                    )
+                    .finish(),
+                SemKind::ChainClosed { statements } => statements
+                    .iter()
+                    .fold(
+                        &mut f.debug_tuple(&"chain_closed".bright_green().to_string()),
+                        |structure, expression| structure.field(&expression.debug(semantic, types)),
+                    )
+                    .finish(),
+            }?;
 
-impl Debug for DebugSem<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let sem = |sem| DebugSem {
-            semantic: self.semantic,
-            types: self.types,
-            sem,
-        };
-
-        let mut display = |name: &str, children: &[&dyn Debug]| {
-            children
-                .iter()
-                .fold(
-                    &mut f.debug_tuple(name.bright_green().to_string().as_str()),
-                    |tuple, field| tuple.field(field),
-                )
-                .finish()
-        };
-
-        match &self.semantic.kinds[self.sem] {
-            SemKind::Number(_) => display("number", &[]),
-            SemKind::False(_) => display("false", &[]),
-            SemKind::True(_) => display("true", &[]),
-            SemKind::Module { bindings } => bindings
-                .iter()
-                .fold(
-                    &mut f.debug_struct("module".bright_green().to_string().as_str()),
-                    |structure, (name, value)| {
-                        structure.field(&name.bright_cyan().to_string(), &sem(*value))
-                    },
-                )
-                .finish(),
-            SemKind::Function { argument, body } => display(
-                "function",
-                &[&DebugUsingDisplay(argument.bright_cyan()), &sem(*body)],
-            ),
-            SemKind::Binding { name, value, body } => display(
-                "binding",
-                &[
-                    &DebugUsingDisplay(name.bright_cyan()),
-                    &sem(*value),
-                    &sem(*body),
-                ],
-            ),
-            SemKind::MutBinding { name, value, body } => display(
-                "mut_binding",
-                &[
-                    &DebugUsingDisplay(name.bright_cyan()),
-                    &sem(*value),
-                    &sem(*body),
-                ],
-            ),
-            SemKind::Assignment { binding, value } => display(
-                "assignment",
-                &[&DebugUsingDisplay(binding.bright_cyan()), &sem(*value)],
-            ),
-            SemKind::Reference { name } => f.write_str(&format!(
-                "{}({})",
-                "reference".bright_green(),
-                name.bright_cyan()
-            )),
-            SemKind::Access { field, expr } => display(
-                "access",
-                &[&DebugUsingDisplay(field.bright_cyan()), &sem(*expr)],
-            ),
-            SemKind::Application { function, argument } => {
-                display("application", &[&sem(*function), &sem(*argument)])
-            }
-            SemKind::Loop(body) => display("loop", &[&sem(*body)]),
-            SemKind::If { condition, then } => display("if", &[&sem(*condition), &sem(*then)]),
-            SemKind::IfElse {
-                condition,
-                then,
-                else_,
-            } => display("if", &[&sem(*condition), &sem(*then), &sem(*else_)]),
-            SemKind::BuildStruct { fields } => fields
-                .iter()
-                .fold(
-                    &mut f.debug_struct("build_struct".bright_green().to_string().as_str()),
-                    |structure, (name, value)| {
-                        structure.field(&name.bright_cyan().to_string(), &sem(*value))
-                    },
-                )
-                .finish(),
-            SemKind::ChainOpen {
-                statements,
-                expression,
-            } => statements
-                .iter()
-                .chain([expression])
-                .fold(
-                    &mut f.debug_tuple("chain_open".bright_green().to_string().as_str()),
-                    |structure, expression| structure.field(&sem(*expression)),
-                )
-                .finish(),
-            SemKind::ChainClosed { statements } => statements
-                .iter()
-                .fold(
-                    &mut f.debug_tuple("chain_closed".bright_green().to_string().as_str()),
-                    |structure, expression| structure.field(&sem(*expression)),
-                )
-                .finish(),
-        }?;
-
-        write!(f, "{}", ": ".white().to_string())?;
-        write!(f, "{}", self.semantic.types[self.sem].debug(&self.types))
+            write!(f, "{}", ": ".white())?;
+            write!(f, "{}", semantic.types[self].debug(&types))
+        })
     }
 }
 
-struct DebugUsingDisplay<T>(T);
-
-impl<T: Display> Debug for DebugUsingDisplay<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
+pub fn debug_with_display(display: impl Display) -> impl Debug {
+    std::fmt::from_fn(move |f| display.fmt(f))
 }
 
 impl Type {
