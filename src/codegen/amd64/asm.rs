@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    amd64_allocation::{Allocation, Allocations},
+    codegen::amd64::allocation::{Allocation, Allocations},
     key_vec::{KeyVec, Sentinel, Val},
     semantic::{Type, TypeData, TypeSentinel, Types},
     ssa::{Block, BlockData, BlockSentinel, ConstData, ConstSentinel, Expr, Inst, InstData, Ssa},
