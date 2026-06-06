@@ -66,6 +66,7 @@ fn run_ssa_with_amd64_asm_codegen(types: &Types, ssa: &Ssa) {
     let start = Instant::now();
     let allocations = codegen::amd64::allocation::allocate(&types, &ssa);
     debug_header_duration("AMD64 REGISTER ALLOCATION", start);
+    codegen::amd64::allocation::debug(types, ssa, &allocations);
 
     let start = Instant::now();
     let asm = codegen::amd64::asm::generate(&types, &ssa, &allocations);
