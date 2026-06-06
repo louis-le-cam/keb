@@ -64,6 +64,13 @@ impl Allocation {
         }
     }
 
+    pub fn is_memory(&self) -> bool {
+        matches!(
+            self,
+            Allocation::Stack { .. } | Allocation::StackArgument { .. },
+        )
+    }
+
     pub fn move_to(&self, destination: &Allocation) -> String {
         if self == destination {
             return String::new();
@@ -71,6 +78,15 @@ impl Allocation {
 
         match destination.size() {
             0 => String::new(),
+            4 if self.is_memory() && destination.is_memory() => format!(
+                "  movl {}, {}\n  movl {}, {}\n",
+                self.asm().unwrap(),
+                // FIXME: Took a random register to move memory to memory, not
+                // the greatest idea.
+                Allocation::R8d.asm().unwrap(),
+                Allocation::R8d.asm().unwrap(),
+                destination.asm().unwrap(),
+            ),
             4 => format!(
                 "  movl {}, {}\n",
                 self.asm().unwrap(),
