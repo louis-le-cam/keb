@@ -40,8 +40,45 @@ pub fn allocate(types: &Types, ssa: &Ssa) -> Allocations {
 impl Allocator<'_> {
     fn allocate_all(&mut self) {
         for (block, block_data) in self.ssa.blocks.entries() {
-            self.allocate_function(block, block_data);
+            match block_data {
+                BlockData::ExternFunction { .. } => {
+                    self.allocate_extern_function(block, block_data)
+                }
+                BlockData::Function { .. } => self.allocate_function(block, block_data),
+                BlockData::Block { .. } => {}
+            };
         }
+    }
+
+    /// Implements a subset of the cdelc calling convention.
+    fn allocate_extern_function(&mut self, function: Block, block_data: &BlockData) {
+        let BlockData::ExternFunction { name: _, arg, ret } = block_data else {
+            panic!();
+        };
+
+        self.allocations.arguments[function] = match self.types.get(*arg) {
+            Val::None => panic!(),
+            Val::Sentinel(sentinel) => match sentinel {
+                TypeSentinel::Unknown => panic!(),
+                TypeSentinel::Unit => Allocation::Unit,
+                TypeSentinel::Uint32 => Allocation::Eax,
+                TypeSentinel::Bool | TypeSentinel::False | TypeSentinel::True => todo!(),
+            },
+            Val::Value(_) => todo!(),
+        };
+
+        self.allocations.returns[function] = match self.types.get(*ret) {
+            Val::None => panic!(),
+            Val::Sentinel(sentinel) => match sentinel {
+                TypeSentinel::Unknown => panic!(),
+                TypeSentinel::Unit => Allocation::Unit,
+                TypeSentinel::Uint32
+                | TypeSentinel::Bool
+                | TypeSentinel::False
+                | TypeSentinel::True => todo!(),
+            },
+            Val::Value(_) => todo!(),
+        };
     }
 
     fn allocate_function(&mut self, function: Block, block_data: &BlockData) {
@@ -52,7 +89,7 @@ impl Allocator<'_> {
             insts,
         } = block_data
         else {
-            return;
+            panic!();
         };
 
         let mut stack_bottom = 0;

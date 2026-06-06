@@ -79,6 +79,7 @@ fn run_ssa_with_amd64_asm_codegen(types: &Types, ssa: &Ssa) {
         .args([
             "-O0",
             "output.s",
+            "src/codegen/amd64/lib.c",
             "-m64",
             "-Xlinker",
             "-z",
