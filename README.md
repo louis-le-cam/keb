@@ -4,6 +4,10 @@ A toy compiled, statically typed, functionnal programming language.
 
 ## Function argument pattern matching
 
+Function do only take one argument, but this argument can be a tuple/struct.
+The definition of a function's argument is a pattern which can destructure the
+single argument into multiple.
+
 ```keb
 let add = (a: u32, b: u32) => a + b;
 
