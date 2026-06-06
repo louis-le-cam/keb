@@ -27,16 +27,32 @@ let main = print fact 8;
 
 The compiler follows a pretty simple multi-stage architecture, each stage
 consumes some of the precedent stages outputs and produces one or multiple
-outputs:
+outputs.
 
-- `lexer/tokenizer`: `source` => `tokens`
-- `syntax parser`: `tokens` => `syns` (syntax nodes)
-- `semantic parser`: `source`, `tokens`, `syns` => `sems` (semantic nodes), `types`
-- `type inference`: `sems`, `types` => `sems`, `types`
-- `ssa generation`: `source`, `tokens`, `sems`, `types` => `ssa`, `*types*`
+Here's a pseudo-code of the compilation process, this is pretty much the code in
+`src/main.rs` without debug noise:
 
-Then the codegen step can be either:
-- `c codegen`: `ssa`, `types` => `c source code`
-- `amd64 codegen`: `ssa`, `types` => `gnu assembly`
+```rust
+fn compile_ssa(source: &str) -> (Types, Ssa) {
+    let tokens = token::lex(&source);
 
-All theses steps are explicitly written down in `src/main.rs`
+    let syntax = syntax::parse(&tokens.kinds);
+
+    let (mut semantic, mut types) = semantic::parse(&source, &tokens.offsets, &syntax);
+    semantic::infer_types(&mut semantic, &mut types);
+
+    let ssa = ssa::generate(&source, &tokens.offsets, &semantic, &mut types);
+
+    (types, ssa)
+}
+
+fn compile_to_amd64(types: &Types, ssa: &Ssa) -> String {
+    let allocations = codegen::amd64::allocation::allocate(&types, &ssa);
+
+    codegen::amd64::asm::generate(&types, &ssa, &allocations)
+}
+
+fn compile_to_c(types: &Types, ssa: &Ssa) -> String {
+    codegen::c::generate(&types, &ssa)
+}
+```
