@@ -1,4 +1,4 @@
-use crate::key_vec::{Index, KeyVec, Sentinel};
+use crate::key_vec::{Index, KeyVec, Sentinels};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
@@ -42,7 +42,7 @@ pub enum TokenKind {
     InterpolationEnd,
 }
 
-#[derive(Sentinel, Clone, Copy, Debug)]
+#[derive(Sentinels, Clone, Copy, Debug)]
 pub enum TokenSentinel {}
 
 pub type Token = Index<TokenSentinel>;

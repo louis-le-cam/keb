@@ -1,4 +1,7 @@
-use crate::key_vec::{Index, KeyVec, Sentinel, Val};
+use crate::key_vec::{
+    Index, KeyVec, Sentinels,
+    Value::{Item, Sentinel},
+};
 
 #[derive(Debug)]
 pub enum TypeData {
@@ -12,7 +15,7 @@ pub enum TypeData {
 }
 
 #[repr(u32)]
-#[derive(Sentinel, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Sentinels, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TypeSentinel {
     Unknown = u32::MAX - 5,
     Unit,
@@ -29,31 +32,31 @@ pub type Types = KeyVec<TypeSentinel, TypeData>;
 // mismatch.
 pub fn combine_types(types: &mut Types, lhs: Type, rhs: Type) -> Type {
     match (types.get(lhs), types.get(rhs)) {
-        (Val::Sentinel(TypeSentinel::Unknown), _) => rhs,
-        (_, Val::Sentinel(TypeSentinel::Unknown)) => lhs,
-        (Val::Sentinel(TypeSentinel::Unit), Val::Sentinel(TypeSentinel::Unit)) => {
+        (Sentinel(TypeSentinel::Unknown), _) => rhs,
+        (_, Sentinel(TypeSentinel::Unknown)) => lhs,
+        (Sentinel(TypeSentinel::Unit), Sentinel(TypeSentinel::Unit)) => {
             TypeSentinel::Unit.to_index()
         }
-        (Val::Sentinel(TypeSentinel::Uint32), Val::Sentinel(TypeSentinel::Uint32)) => {
+        (Sentinel(TypeSentinel::Uint32), Sentinel(TypeSentinel::Uint32)) => {
             TypeSentinel::Uint32.to_index()
         }
-        (Val::Sentinel(TypeSentinel::Bool), Val::Sentinel(TypeSentinel::Bool))
-        | (Val::Sentinel(TypeSentinel::True), Val::Sentinel(TypeSentinel::False))
-        | (Val::Sentinel(TypeSentinel::False), Val::Sentinel(TypeSentinel::True)) => {
+        (Sentinel(TypeSentinel::Bool), Sentinel(TypeSentinel::Bool))
+        | (Sentinel(TypeSentinel::True), Sentinel(TypeSentinel::False))
+        | (Sentinel(TypeSentinel::False), Sentinel(TypeSentinel::True)) => {
             TypeSentinel::Bool.to_index()
         }
-        (Val::Sentinel(TypeSentinel::False), Val::Sentinel(TypeSentinel::False)) => {
+        (Sentinel(TypeSentinel::False), Sentinel(TypeSentinel::False)) => {
             TypeSentinel::False.to_index()
         }
-        (Val::Sentinel(TypeSentinel::True), Val::Sentinel(TypeSentinel::True)) => {
+        (Sentinel(TypeSentinel::True), Sentinel(TypeSentinel::True)) => {
             TypeSentinel::True.to_index()
         }
         (
-            Val::Value(&TypeData::Function {
+            Item(&TypeData::Function {
                 argument_type: lhs_arg,
                 return_type: lhs_ret,
             }),
-            Val::Value(&TypeData::Function {
+            Item(&TypeData::Function {
                 argument_type: rhs_arg,
                 return_type: rhs_ret,
             }),
@@ -65,30 +68,30 @@ pub fn combine_types(types: &mut Types, lhs: Type, rhs: Type) -> Type {
             types.push(type_)
         }
         // TODO: actually merge both products
-        (Val::Value(TypeData::Product { .. }), Val::Value(TypeData::Product { .. })) => lhs,
+        (Item(TypeData::Product { .. }), Item(TypeData::Product { .. })) => lhs,
         (a, b) => panic!("No rules to merge types {a:?} and {b:?}"),
     }
 }
 
 pub fn types_equals(types: &Types, lhs: Type, rhs: Type) -> bool {
     match (types.get(lhs), types.get(rhs)) {
-        (Val::Sentinel(TypeSentinel::Unknown), Val::Sentinel(TypeSentinel::Unknown)) => true,
-        (Val::Sentinel(TypeSentinel::Unit), Val::Sentinel(TypeSentinel::Unit)) => true,
-        (Val::Sentinel(TypeSentinel::Uint32), Val::Sentinel(TypeSentinel::Uint32)) => true,
-        (Val::Sentinel(TypeSentinel::Bool), Val::Sentinel(TypeSentinel::Bool)) => true,
-        (Val::Sentinel(TypeSentinel::False), Val::Sentinel(TypeSentinel::False)) => true,
-        (Val::Sentinel(TypeSentinel::True), Val::Sentinel(TypeSentinel::True)) => true,
+        (Sentinel(TypeSentinel::Unknown), Sentinel(TypeSentinel::Unknown)) => true,
+        (Sentinel(TypeSentinel::Unit), Sentinel(TypeSentinel::Unit)) => true,
+        (Sentinel(TypeSentinel::Uint32), Sentinel(TypeSentinel::Uint32)) => true,
+        (Sentinel(TypeSentinel::Bool), Sentinel(TypeSentinel::Bool)) => true,
+        (Sentinel(TypeSentinel::False), Sentinel(TypeSentinel::False)) => true,
+        (Sentinel(TypeSentinel::True), Sentinel(TypeSentinel::True)) => true,
         (
-            Val::Sentinel(TypeSentinel::Unit)
-            | Val::Sentinel(TypeSentinel::Uint32)
-            | Val::Sentinel(TypeSentinel::Bool)
-            | Val::Sentinel(TypeSentinel::False)
-            | Val::Sentinel(TypeSentinel::True),
+            Sentinel(TypeSentinel::Unit)
+            | Sentinel(TypeSentinel::Uint32)
+            | Sentinel(TypeSentinel::Bool)
+            | Sentinel(TypeSentinel::False)
+            | Sentinel(TypeSentinel::True),
             _,
         ) => false,
         (
-            Val::Value(TypeData::Product { fields: lhs_fields }),
-            Val::Value(TypeData::Product { fields: rhs_fields }),
+            Item(TypeData::Product { fields: lhs_fields }),
+            Item(TypeData::Product { fields: rhs_fields }),
         ) => {
             lhs_fields.len() == rhs_fields.len()
                 && lhs_fields

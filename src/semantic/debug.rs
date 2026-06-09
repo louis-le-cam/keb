@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 use colored::Colorize as _;
 
 use crate::{
-    key_vec::Val,
+    key_vec::Value::{Item, Sentinel},
     semantic::{ROOT_SEM, Sem, SemKind, Semantic, Type, TypeData, TypeSentinel, Types},
 };
 
@@ -129,7 +129,7 @@ pub fn debug_with_display(display: impl Display) -> impl Debug {
 impl Type {
     pub fn debug(self, types: &Types) -> impl Display {
         std::fmt::from_fn(move |f| match types.get(self) {
-            Val::Sentinel(sentinel) => {
+            Sentinel(sentinel) => {
                 let text = match sentinel {
                     TypeSentinel::Unknown => "unknown",
                     TypeSentinel::Unit => "()",
@@ -141,7 +141,7 @@ impl Type {
 
                 write!(f, "{}", text.bright_blue())
             }
-            Val::Value(type_data) => match type_data {
+            Item(type_data) => match type_data {
                 TypeData::Function {
                     argument_type,
                     return_type,

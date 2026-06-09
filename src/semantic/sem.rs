@@ -1,5 +1,5 @@
 use crate::{
-    key_vec::{Index, KeyVec, Sentinel},
+    key_vec::{Index, KeyVec, Sentinels},
     semantic::Type,
     token::Token,
 };
@@ -63,7 +63,7 @@ pub enum SemKind {
     },
 }
 
-#[derive(Sentinel, Clone, Copy, Debug)]
+#[derive(Sentinels, Clone, Copy, Debug)]
 pub enum SemSentinel {}
 
 pub type Sem = Index<SemSentinel>;

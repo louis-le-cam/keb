@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    key_vec::{Sentinel, Val},
+    key_vec::{
+        Sentinels,
+        Value::{Item, Sentinel},
+    },
     semantic::{self, Sem, SemKind, Semantic, Type, TypeData, TypeSentinel, Types, combine_types},
 };
 
@@ -101,8 +104,8 @@ impl Inferrer<'_> {
                 {
                     let (argument_type, return_type) = match self.types.get(self.semantic.types[i])
                     {
-                        Val::Sentinel(_) => panic!(),
-                        Val::Value(type_data) => match type_data {
+                        Sentinel(_) => panic!(),
+                        Item(type_data) => match type_data {
                             TypeData::Function {
                                 argument_type,
                                 return_type,
@@ -128,7 +131,7 @@ impl Inferrer<'_> {
                     let sem_type = self.semantic.types[i];
 
                     let (argument_type, return_type) = match &self.types.get(sem_type) {
-                        Val::Value(TypeData::Function {
+                        Item(TypeData::Function {
                             argument_type,
                             return_type,
                         }) => (*argument_type, *return_type),
@@ -172,11 +175,11 @@ impl Inferrer<'_> {
                     ScopeItem::Sem(sem) => self.add_type(value, self.semantic.types[sem]),
                     ScopeItem::Argument(sem) => {
                         match self.types.get(self.semantic.types[sem]) {
-                            Val::Value(TypeData::Function {
+                            Item(TypeData::Function {
                                 argument_type,
                                 return_type: _,
                             }) => self.add_type(value, *argument_type),
-                            Val::Sentinel(_) | Val::Value(_) => {}
+                            Sentinel(_) | Item(_) => {}
                         }
 
                         todo!()
@@ -190,8 +193,8 @@ impl Inferrer<'_> {
                 let type_ = match scope[name] {
                     ScopeItem::Sem(sem) => self.semantic.types[sem],
                     ScopeItem::Argument(sem) => match self.types.get(self.semantic.types[sem]) {
-                        Val::Value(TypeData::Function { argument_type, .. }) => *argument_type,
-                        Val::Sentinel(_) | Val::Value(_) => panic!(),
+                        Item(TypeData::Function { argument_type, .. }) => *argument_type,
+                        Sentinel(_) | Item(_) => panic!(),
                     },
                     ScopeItem::Type(ty) => ty,
                 };
@@ -206,15 +209,15 @@ impl Inferrer<'_> {
 
                 match self.types.get(self.semantic.types[expr]) {
                     // TODO: Infer for unknown types
-                    Val::Sentinel(_) => {}
-                    Val::Value(TypeData::Product { fields }) => {
+                    Sentinel(_) => {}
+                    Item(TypeData::Product { fields }) => {
                         if let Some((_, field_type)) =
                             fields.iter().find(|(name, _)| name == &field)
                         {
                             self.add_type(i, *field_type);
                         }
                     }
-                    Val::Value(_) => panic!(),
+                    Item(_) => panic!(),
                 }
             }
             SemKind::Application { function, argument } => {
@@ -225,10 +228,10 @@ impl Inferrer<'_> {
                 self.infer_expression(scope, argument);
 
                 match self.types.get(self.semantic.types[function]) {
-                    Val::Value(TypeData::Function { return_type, .. }) => {
+                    Item(TypeData::Function { return_type, .. }) => {
                         self.add_type(i, *return_type);
                     }
-                    Val::Sentinel(_) | Val::Value(_) => panic!(),
+                    Sentinel(_) | Item(_) => panic!(),
                 }
             }
             SemKind::Loop(body) => {

@@ -1,5 +1,5 @@
 use crate::{
-    key_vec::Sentinel,
+    key_vec::Sentinels,
     semantic::{
         self, Sem, SemKind, SemKinds, SemTypes, Semantic, Type, TypeData, TypeSentinel, Types,
         combine_types,

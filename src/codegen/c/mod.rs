@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    key_vec::Val,
+    key_vec::Value::{Item, Sentinel},
     semantic::{Type, TypeData, TypeSentinel, Types, types_equals},
     ssa::{Block, BlockData, ConstData, ConstSentinel, Expr, Inst, InstData, Ssa},
 };
@@ -298,13 +298,13 @@ impl Generator<'_> {
 
     fn generate_type(&mut self, type_: Type) -> String {
         match self.types.get(type_) {
-            Val::Sentinel(sentinel) => match sentinel {
+            Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
                 TypeSentinel::Unit => "void".to_string(),
                 TypeSentinel::Uint32 => "unsigned int".to_string(),
                 TypeSentinel::Bool | TypeSentinel::False | TypeSentinel::True => "bool".to_string(),
             },
-            Val::Value(type_data) => match type_data {
+            Item(type_data) => match type_data {
                 TypeData::Function { .. } => todo!(),
                 TypeData::Product { fields } if fields.is_empty() => "void".to_string(),
                 TypeData::Product { fields } => {
@@ -337,12 +337,12 @@ impl Generator<'_> {
     fn generate_expr(&mut self, expr: Expr) -> String {
         match expr {
             Expr::Const(const_) => match self.ssa.consts.get(const_) {
-                Val::Sentinel(sentinel) => match sentinel {
+                Sentinel(sentinel) => match sentinel {
                     ConstSentinel::Unit => panic!(),
                     ConstSentinel::False => "false".to_string(),
                     ConstSentinel::True => "true".to_string(),
                 },
-                Val::Value(value) => match value {
+                Item(value) => match value {
                     ConstData::Uint32(value) => value.to_string(),
                     ConstData::Product(_, _) => todo!(),
                 },

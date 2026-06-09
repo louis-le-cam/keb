@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    key_vec::{Sentinel, Val},
+    key_vec::{
+        Sentinels,
+        Value::{Item, Sentinel},
+    },
     semantic::{self, Sem, SemKind, Semantic, TypeData, TypeSentinel, Types},
     token::{self, TokenOffsets},
 };
@@ -85,7 +88,7 @@ impl Generator<'_> {
                 panic!()
             };
 
-            let Val::Value(TypeData::Function {
+            let Item(TypeData::Function {
                 argument_type,
                 return_type,
             }) = self.types.get(self.semantic.types[*value])
@@ -160,10 +163,10 @@ impl Generator<'_> {
             SemKind::Reference { name } => scope.binding(name).unwrap(),
             SemKind::Access { field, expr } => {
                 let field_index = match self.types.get(self.semantic.types[*expr]) {
-                    Val::Value(TypeData::Product { fields }) => {
+                    Item(TypeData::Product { fields }) => {
                         fields.iter().position(|(name, _)| field == name).unwrap()
                     }
-                    Val::Sentinel(_) | Val::Value(_) => panic!(),
+                    Sentinel(_) | Item(_) => panic!(),
                 };
 
                 let expr = self.generate_expression(block, *expr, scope);

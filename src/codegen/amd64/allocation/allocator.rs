@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use crate::{
     codegen::amd64::allocation::allocation::{Allocation, Allocations, InstAllocations},
-    key_vec::{KeyVec, Sentinel as _, Val},
+    key_vec::{
+        KeyVec, Sentinels as _,
+        Value::{Item, Sentinel},
+    },
     semantic::{Type, TypeData, TypeSentinel, Types},
     ssa::{Block, BlockData, ConstData, ConstSentinel, Expr, Inst, InstData, Ssa},
 };
@@ -57,17 +60,17 @@ impl Allocator<'_> {
         };
 
         self.allocations.arguments[function] = match self.types.get(*arg) {
-            Val::Sentinel(sentinel) => match sentinel {
+            Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
                 TypeSentinel::Unit => Allocation::Unit,
                 TypeSentinel::Uint32 => Allocation::Eax,
                 TypeSentinel::Bool | TypeSentinel::False | TypeSentinel::True => todo!(),
             },
-            Val::Value(_) => todo!(),
+            Item(_) => todo!(),
         };
 
         self.allocations.returns[function] = match self.types.get(*ret) {
-            Val::Sentinel(sentinel) => match sentinel {
+            Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
                 TypeSentinel::Unit => Allocation::Unit,
                 TypeSentinel::Uint32
@@ -75,7 +78,7 @@ impl Allocator<'_> {
                 | TypeSentinel::False
                 | TypeSentinel::True => todo!(),
             },
-            Val::Value(_) => todo!(),
+            Item(_) => todo!(),
         };
     }
 
@@ -165,8 +168,8 @@ impl Allocator<'_> {
                 let expr_type = self.expr_type(*expr);
 
                 let field_type = match self.types.get(expr_type) {
-                    Val::Sentinel(_) => panic!(),
-                    Val::Value(type_data) => match type_data {
+                    Sentinel(_) => panic!(),
+                    Item(type_data) => match type_data {
                         TypeData::Function { .. } => panic!(),
                         TypeData::Product { fields } => fields[*field as usize].1,
                     },
@@ -514,13 +517,13 @@ impl Allocator<'_> {
 
     fn type_size(&self, type_: Type) -> u64 {
         match self.types.get(type_) {
-            Val::Sentinel(sentinel) => match sentinel {
+            Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
                 TypeSentinel::Bool | TypeSentinel::False | TypeSentinel::True => 4,
                 TypeSentinel::Unit => 0,
                 TypeSentinel::Uint32 => 4,
             },
-            Val::Value(type_data) => match type_data {
+            Item(type_data) => match type_data {
                 TypeData::Function { .. } => panic!(),
                 TypeData::Product { fields } => {
                     let size = fields
@@ -537,12 +540,12 @@ impl Allocator<'_> {
     fn expr_type(&self, expr: Expr) -> Type {
         match expr {
             Expr::Const(const_) => match self.ssa.consts.get(const_) {
-                Val::Sentinel(sentinel) => match sentinel {
+                Sentinel(sentinel) => match sentinel {
                     ConstSentinel::Unit => TypeSentinel::Unit.to_index(),
                     ConstSentinel::False => TypeSentinel::False.to_index(),
                     ConstSentinel::True => TypeSentinel::True.to_index(),
                 },
-                Val::Value(const_data) => match const_data {
+                Item(const_data) => match const_data {
                     ConstData::Uint32(_) => TypeSentinel::Uint32.to_index(),
                     ConstData::Product(_, _) => todo!(),
                 },

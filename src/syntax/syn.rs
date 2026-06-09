@@ -1,5 +1,5 @@
 use crate::{
-    key_vec::{Index, KeyVec, Sentinel},
+    key_vec::{Index, KeyVec, Sentinels},
     token::Token,
 };
 
@@ -88,7 +88,7 @@ pub enum StringSegment {
     Interpolation(Syn),
 }
 
-#[derive(Sentinel, Clone, Copy, Debug)]
+#[derive(Sentinels, Clone, Copy, Debug)]
 pub enum SynSentinel {}
 
 pub type Syn = Index<SynSentinel>;

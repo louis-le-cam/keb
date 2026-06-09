@@ -1,5 +1,8 @@
 use crate::{
-    key_vec::{Index, KeyVec, Sentinel, Val},
+    key_vec::{
+        Index, KeyVec, Sentinels,
+        Value::{Item, Sentinel},
+    },
     semantic::{Type, TypeData, TypeSentinel, Types},
 };
 
@@ -31,8 +34,8 @@ impl Ssa {
                 let record_type = self.expression_type(types, *expr);
 
                 match types.get(record_type) {
-                    Val::Value(TypeData::Product { fields }) => fields[field as usize].1,
-                    Val::Sentinel(_) | Val::Value(_) => panic!(),
+                    Item(TypeData::Product { fields }) => fields[field as usize].1,
+                    Sentinel(_) | Item(_) => panic!(),
                 }
             }
             InstData::Record(_, ty) => *ty,
@@ -55,12 +58,12 @@ impl Ssa {
 
     pub fn const_type(&self, const_: Const) -> Type {
         match self.consts.get(const_) {
-            Val::Sentinel(sentinel) => match sentinel {
+            Sentinel(sentinel) => match sentinel {
                 ConstSentinel::Unit => TypeSentinel::Unit.to_index(),
                 ConstSentinel::False => TypeSentinel::False.to_index(),
                 ConstSentinel::True => TypeSentinel::True.to_index(),
             },
-            Val::Value(value) => match value {
+            Item(value) => match value {
                 ConstData::Uint32(_) => TypeSentinel::Uint32.to_index(),
                 ConstData::Product(_, ty) => *ty,
             },
@@ -189,14 +192,14 @@ impl Ssa {
     }
 }
 
-#[derive(Sentinel, Clone, Copy, Debug)]
+#[derive(Sentinels, Clone, Copy, Debug)]
 pub enum BlockSentinel {}
 
-#[derive(Sentinel, Clone, Copy, Debug)]
+#[derive(Sentinels, Clone, Copy, Debug)]
 pub enum InstSentinel {}
 
 #[repr(u32)]
-#[derive(Sentinel, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Sentinels, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConstSentinel {
     Unit = u32::MAX - 2,
     False,

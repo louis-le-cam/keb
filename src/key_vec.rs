@@ -1,12 +1,12 @@
 //! A [`KeyVec`] equivalent to a [`Vec`] with typed index and sentinel values in
 //! the index itself.
 //!
-//! [`KeyVec<S, V>`] are indexed using the [`Index<S>`] type. You can obtain
-//! [`Index<S>`] whenever you push a value to the [`KeyVec<S, V>`].
+//! [`KeyVec<S, I>`] are indexed using the [`Index<S>`] type. You can obtain
+//! [`Index<S>`] whenever you push a value to the [`KeyVec<S, I>`].
 //!
-//! [`KeyVec<S, V>`] do not currently support removal of items.
+//! [`KeyVec<S, I>`] do not currently support removal of items.
 //!
-//! The `S` generic in [`KeyVec<S, V>`] both serves as a marker for the
+//! The `S` generic in [`KeyVec<S, I>`] both serves as a marker for the
 //! [`KeyVec`] and as a enumeration of sentinel values stored in the index
 //! itself.
 //!
@@ -33,40 +33,40 @@
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
-pub struct KeyVec<S: Sentinel, V>(Vec<V>, PhantomData<S>);
+pub struct KeyVec<S: Sentinels, I>(Vec<I>, PhantomData<S>);
 
 #[derive(Debug)]
-pub enum Val<S, V> {
+pub enum Value<S, I> {
     Sentinel(S),
-    Value(V),
+    Item(I),
 }
 
-pub trait Sentinel: Sized + Clone + Copy {
+pub trait Sentinels: Sized + Clone + Copy {
     fn from_index(index: Index<Self>) -> Option<Self>;
 
     fn to_index(self) -> Index<Self>;
 }
 
-pub trait NonEmptySentinel: Sentinel {}
+pub trait NonEmptySentinel: Sentinels {}
 
-pub trait EmptySentinel: Sentinel {}
+pub trait EmptySentinel: Sentinels {}
 
 #[derive(Clone, Copy)]
-pub struct Index<S: Sentinel> {
+pub struct Index<S: Sentinels> {
     index: u32,
     __phantom_data: PhantomData<S>,
 }
 
-impl<S: Sentinel, V> KeyVec<S, V> {
+impl<S: Sentinels, I> KeyVec<S, I> {
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    pub fn from_vec(vec: Vec<V>) -> Self {
+    pub fn from_vec(vec: Vec<I>) -> Self {
         Self(vec, PhantomData)
     }
 
-    pub fn push(&mut self, value: V) -> Index<S> {
+    pub fn push(&mut self, value: I) -> Index<S> {
         let index = Index {
             index: self.0.len() as u32,
             __phantom_data: PhantomData,
@@ -75,7 +75,7 @@ impl<S: Sentinel, V> KeyVec<S, V> {
         index
     }
 
-    pub fn entries(&self) -> impl Iterator<Item = (Index<S>, &V)> {
+    pub fn entries(&self) -> impl Iterator<Item = (Index<S>, &I)> {
         self.0.iter().enumerate().map(|(i, v)| {
             (
                 Index {
@@ -88,63 +88,63 @@ impl<S: Sentinel, V> KeyVec<S, V> {
     }
 }
 
-impl<S: NonEmptySentinel, V> KeyVec<S, V> {
-    pub fn get(&self, index: Index<S>) -> Val<S, &V> {
+impl<S: NonEmptySentinel, I> KeyVec<S, I> {
+    pub fn get(&self, index: Index<S>) -> Value<S, &I> {
         match S::from_index(index) {
-            Some(sentinel) => Val::Sentinel(sentinel),
-            None => Val::Value(&self.0[index.index as usize]),
+            Some(sentinel) => Value::Sentinel(sentinel),
+            None => Value::Item(&self.0[index.index as usize]),
         }
     }
 
-    pub fn get_mut(&mut self, index: Index<S>) -> Val<S, &mut V> {
+    pub fn get_mut(&mut self, index: Index<S>) -> Value<S, &mut I> {
         match S::from_index(index) {
-            Some(sentinel) => Val::Sentinel(sentinel),
-            None => Val::Value(&mut self.0[index.index as usize]),
+            Some(sentinel) => Value::Sentinel(sentinel),
+            None => Value::Item(&mut self.0[index.index as usize]),
         }
     }
 }
 
-impl<S: EmptySentinel, V> core::ops::Index<Index<S>> for KeyVec<S, V> {
-    type Output = V;
+impl<S: EmptySentinel, I> core::ops::Index<Index<S>> for KeyVec<S, I> {
+    type Output = I;
 
     fn index(&self, index: Index<S>) -> &Self::Output {
         &self.0[index.index as usize]
     }
 }
 
-impl<S: EmptySentinel, V> core::ops::IndexMut<Index<S>> for KeyVec<S, V> {
+impl<S: EmptySentinel, I> core::ops::IndexMut<Index<S>> for KeyVec<S, I> {
     fn index_mut(&mut self, index: Index<S>) -> &mut Self::Output {
         &mut self.0[index.index as usize]
     }
 }
 
-impl<S: Sentinel, V> Default for KeyVec<S, V> {
+impl<S: Sentinels, I> Default for KeyVec<S, I> {
     fn default() -> Self {
         Self(Vec::new(), PhantomData)
     }
 }
 
-impl<S: Sentinel, V: Debug> Debug for KeyVec<S, V> {
+impl<S: Sentinels, I: Debug> Debug for KeyVec<S, I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl<S: Sentinel> PartialEq for Index<S> {
+impl<S: Sentinels> PartialEq for Index<S> {
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index
     }
 }
 
-impl<S: Sentinel> Eq for Index<S> {}
+impl<S: Sentinels> Eq for Index<S> {}
 
-impl<S: Sentinel> Hash for Index<S> {
+impl<S: Sentinels> Hash for Index<S> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.index.hash(state);
     }
 }
 
-impl<S: Sentinel> Index<S> {
+impl<S: Sentinels> Index<S> {
     pub const fn as_u32(self) -> u32 {
         self.index
     }
@@ -162,7 +162,7 @@ impl<S: Sentinel> Index<S> {
 }
 
 mod derive {
-    macro_rules! Sentinel {
+    macro_rules! Sentinels {
         derive() (
             $(#[$($attr:tt)*])* $vis:vis enum $name:ident {}
         ) => {
@@ -176,7 +176,7 @@ mod derive {
 
             impl $crate::key_vec::EmptySentinel for $name { }
 
-            impl $crate::key_vec::Sentinel for $name {
+            impl $crate::key_vec::Sentinels for $name {
                 fn from_index(
                     index: $crate::key_vec::Index<Self>,
                 ) -> ::core::option::Option<Self> {
@@ -202,7 +202,7 @@ mod derive {
         ) => {
             impl $crate::key_vec::NonEmptySentinel for $name {}
 
-            impl $crate::key_vec::Sentinel for $name {
+            impl $crate::key_vec::Sentinels for $name {
                 fn from_index(
                     index: $crate::key_vec::Index<Self>,
                 ) -> ::core::option::Option<Self> {
@@ -227,7 +227,7 @@ mod derive {
 
             impl ::core::fmt::Debug for $crate::key_vec::Index<$name> {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    if let ::core::option::Option::Some(sentinel) = <$name as $crate::key_vec::Sentinel>::from_index(*self) {
+                    if let ::core::option::Option::Some(sentinel) = <$name as $crate::key_vec::Sentinels>::from_index(*self) {
                         ::core::fmt::Debug::fmt(&sentinel, f)
                     } else {
                         f.debug_tuple(stringify!($name)).field(&self.as_u32()).finish()
@@ -237,7 +237,7 @@ mod derive {
         };
     }
 
-    pub(crate) use Sentinel;
+    pub(crate) use Sentinels;
 }
 
-pub(crate) use derive::Sentinel;
+pub(crate) use derive::Sentinels;
