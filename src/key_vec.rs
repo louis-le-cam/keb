@@ -179,8 +179,8 @@ mod derive {
             impl $crate::key_vec::Sentinel for $name {
                 fn from_index(
                     index: $crate::key_vec::Index<Self>,
-                ) -> Option<Self> {
-                    None
+                ) -> ::core::option::Option<Self> {
+                    ::core::option::Option::None
                 }
 
                 fn to_index(self) -> $crate::key_vec::Index<Self> {
@@ -205,7 +205,7 @@ mod derive {
             impl $crate::key_vec::Sentinel for $name {
                 fn from_index(
                     index: $crate::key_vec::Index<Self>,
-                ) -> Option<Self> {
+                ) -> ::core::option::Option<Self> {
                     $(
                         #[allow(non_upper_case_globals)]
                         const $variant: u32 = $name::$variant as u32;
@@ -214,9 +214,9 @@ mod derive {
                     match index.as_u32() {
                         $(
                             #[allow(non_upper_case_globals)]
-                            $variant => Some($name::$variant),
+                            $variant => ::core::option::Option::Some($name::$variant),
                         )*
-                        _ => None,
+                        _ => ::core::option::Option::None,
                     }
                 }
 
@@ -227,7 +227,7 @@ mod derive {
 
             impl ::core::fmt::Debug for $crate::key_vec::Index<$name> {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    if let Some(sentinel) = <$name as $crate::key_vec::Sentinel<>>::from_index(*self) {
+                    if let ::core::option::Option::Some(sentinel) = <$name as $crate::key_vec::Sentinel>::from_index(*self) {
                         ::core::fmt::Debug::fmt(&sentinel, f)
                     } else {
                         f.debug_tuple(stringify!($name)).field(&self.as_u32()).finish()
