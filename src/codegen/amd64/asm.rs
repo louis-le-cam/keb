@@ -216,7 +216,6 @@ impl Generator<'_> {
                 let expr_type = self.expr_type(*expr);
 
                 let field_offset = match self.types.get(expr_type) {
-                    Val::None => panic!(),
                     Val::Sentinel(_) => panic!(),
                     Val::Value(type_data) => match type_data {
                         TypeData::Function { .. } => panic!(),
@@ -227,7 +226,6 @@ impl Generator<'_> {
                 };
 
                 let field_type = match self.types.get(expr_type) {
-                    Val::None => panic!(),
                     Val::Sentinel(_) => panic!(),
                     Val::Value(type_data) => match type_data {
                         TypeData::Function { .. } => panic!(),
@@ -495,7 +493,6 @@ impl Generator<'_> {
             Expr::Inst(inst) => self.allocations.instructions[inst].allocation,
             Expr::BlockArg(block) => self.allocations.arguments[block],
             Expr::Const(const_) => match self.ssa.consts.get(const_) {
-                Val::None => panic!(),
                 Val::Sentinel(_) => panic!(),
                 Val::Value(const_data) => match const_data {
                     ConstData::Uint32(value) => Allocation::Immediate(*value),
@@ -509,7 +506,6 @@ impl Generator<'_> {
     fn expr_type(&self, expr: Expr) -> Type {
         match expr {
             Expr::Const(const_) => match self.ssa.consts.get(const_) {
-                Val::None => panic!(),
                 Val::Sentinel(sentinel) => match sentinel {
                     ConstSentinel::Unit => TypeSentinel::Unit.to_index(),
                     ConstSentinel::False => TypeSentinel::False.to_index(),
@@ -562,7 +558,6 @@ impl Generator<'_> {
 
     fn type_size(&self, type_: Type) -> u64 {
         match self.types.get(type_) {
-            Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
                 TypeSentinel::Bool | TypeSentinel::False | TypeSentinel::True => 4,

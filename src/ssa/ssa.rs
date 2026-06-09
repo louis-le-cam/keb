@@ -32,7 +32,7 @@ impl Ssa {
 
                 match types.get(record_type) {
                     Val::Value(TypeData::Product { fields }) => fields[field as usize].1,
-                    Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
+                    Val::Sentinel(_) | Val::Value(_) => panic!(),
                 }
             }
             InstData::Record(_, ty) => *ty,
@@ -55,7 +55,6 @@ impl Ssa {
 
     pub fn const_type(&self, const_: Const) -> Type {
         match self.consts.get(const_) {
-            Val::None => panic!(),
             Val::Sentinel(sentinel) => match sentinel {
                 ConstSentinel::Unit => TypeSentinel::Unit.to_index(),
                 ConstSentinel::False => TypeSentinel::False.to_index(),

@@ -37,7 +37,6 @@ pub struct KeyVec<S: Sentinel, V>(Vec<V>, PhantomData<S>);
 
 #[derive(Debug)]
 pub enum Val<S, V> {
-    None,
     Sentinel(S),
     Value(V),
 }
@@ -93,20 +92,14 @@ impl<S: NonEmptySentinel, V> KeyVec<S, V> {
     pub fn get(&self, index: Index<S>) -> Val<S, &V> {
         match S::from_index(index) {
             Some(sentinel) => Val::Sentinel(sentinel),
-            None => match self.0.get(index.index as usize) {
-                None => Val::None,
-                Some(value) => Val::Value(value),
-            },
+            None => Val::Value(&self.0[index.index as usize]),
         }
     }
 
     pub fn get_mut(&mut self, index: Index<S>) -> Val<S, &mut V> {
         match S::from_index(index) {
             Some(sentinel) => Val::Sentinel(sentinel),
-            None => match self.0.get_mut(index.index as usize) {
-                Some(value) => Val::Value(value),
-                None => Val::None,
-            },
+            None => Val::Value(&mut self.0[index.index as usize]),
         }
     }
 }

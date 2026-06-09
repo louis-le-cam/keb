@@ -129,7 +129,6 @@ pub fn debug_with_display(display: impl Display) -> impl Debug {
 impl Type {
     pub fn debug(self, types: &Types) -> impl Display {
         std::fmt::from_fn(move |f| match types.get(self) {
-            Val::None => panic!(),
             Val::Sentinel(sentinel) => {
                 let text = match sentinel {
                     TypeSentinel::Unknown => "unknown",

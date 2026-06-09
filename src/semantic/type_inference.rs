@@ -101,7 +101,6 @@ impl Inferrer<'_> {
                 {
                     let (argument_type, return_type) = match self.types.get(self.semantic.types[i])
                     {
-                        Val::None => panic!(),
                         Val::Sentinel(_) => panic!(),
                         Val::Value(type_data) => match type_data {
                             TypeData::Function {
@@ -173,7 +172,6 @@ impl Inferrer<'_> {
                     ScopeItem::Sem(sem) => self.add_type(value, self.semantic.types[sem]),
                     ScopeItem::Argument(sem) => {
                         match self.types.get(self.semantic.types[sem]) {
-                            Val::None => panic!(),
                             Val::Value(TypeData::Function {
                                 argument_type,
                                 return_type: _,
@@ -193,7 +191,7 @@ impl Inferrer<'_> {
                     ScopeItem::Sem(sem) => self.semantic.types[sem],
                     ScopeItem::Argument(sem) => match self.types.get(self.semantic.types[sem]) {
                         Val::Value(TypeData::Function { argument_type, .. }) => *argument_type,
-                        Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
+                        Val::Sentinel(_) | Val::Value(_) => panic!(),
                     },
                     ScopeItem::Type(ty) => ty,
                 };
@@ -207,7 +205,6 @@ impl Inferrer<'_> {
                 self.infer_expression(scope, expr);
 
                 match self.types.get(self.semantic.types[expr]) {
-                    Val::None => panic!(),
                     // TODO: Infer for unknown types
                     Val::Sentinel(_) => {}
                     Val::Value(TypeData::Product { fields }) => {
@@ -231,7 +228,7 @@ impl Inferrer<'_> {
                     Val::Value(TypeData::Function { return_type, .. }) => {
                         self.add_type(i, *return_type);
                     }
-                    Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
+                    Val::Sentinel(_) | Val::Value(_) => panic!(),
                 }
             }
             SemKind::Loop(body) => {

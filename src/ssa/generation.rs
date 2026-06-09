@@ -163,7 +163,7 @@ impl Generator<'_> {
                     Val::Value(TypeData::Product { fields }) => {
                         fields.iter().position(|(name, _)| field == name).unwrap()
                     }
-                    Val::None | Val::Sentinel(_) | Val::Value(_) => panic!(),
+                    Val::Sentinel(_) | Val::Value(_) => panic!(),
                 };
 
                 let expr = self.generate_expression(block, *expr, scope);
