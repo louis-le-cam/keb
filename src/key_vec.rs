@@ -15,21 +15,6 @@
 //!
 //! The `S` must implements the [`Sentinel`] trait, you should implement that
 //! trait using the associated derive-macro.
-//!
-//! The [`Sentinel`] derive-macro also derive on of [`NonEmptySentinel`] or
-//! [`EmptySentinel`] based on wether you sentinel enum has variants or not.
-//!
-//! [`NonEmptySentinel`] and [`EmptySentinel`] are used to provide more
-//! ergonomics to the indexing of the [`KeyVec`].
-//!
-//! On a [`KeyVec`] with [`EmptySentinel`], we can use indexing syntax for
-//! getting elements.
-//!
-//! On a [`KeyVec`] with a [`NonEmptySentinel`], we can use [`KeyVec::get`] and
-//! [`KeyVec::get_mut`].
-//!
-//! A [`EmptySentinel`] kind of defy the purpose of a sentinel, it is only used
-//! as a marker for the collection.
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
@@ -46,10 +31,6 @@ pub trait Sentinels: Sized + Clone + Copy {
 
     fn to_index(self) -> Index<Self>;
 }
-
-pub trait NonEmptySentinel: Sentinels {}
-
-pub trait EmptySentinel: Sentinels {}
 
 #[derive(Clone, Copy)]
 pub struct Index<S: Sentinels> {
@@ -88,7 +69,7 @@ impl<S: Sentinels, I> KeyVec<S, I> {
     }
 }
 
-impl<S: NonEmptySentinel, I> KeyVec<S, I> {
+impl<S: Sentinels, I> KeyVec<S, I> {
     pub fn get(&self, index: Index<S>) -> Value<S, &I> {
         match S::from_index(index) {
             Some(sentinel) => Value::Sentinel(sentinel),
@@ -104,7 +85,7 @@ impl<S: NonEmptySentinel, I> KeyVec<S, I> {
     }
 }
 
-impl<S: EmptySentinel, I> core::ops::Index<Index<S>> for KeyVec<S, I> {
+impl<S: Sentinels, I> core::ops::Index<Index<S>> for KeyVec<S, I> {
     type Output = I;
 
     fn index(&self, index: Index<S>) -> &Self::Output {
@@ -112,7 +93,7 @@ impl<S: EmptySentinel, I> core::ops::Index<Index<S>> for KeyVec<S, I> {
     }
 }
 
-impl<S: EmptySentinel, I> core::ops::IndexMut<Index<S>> for KeyVec<S, I> {
+impl<S: Sentinels, I> core::ops::IndexMut<Index<S>> for KeyVec<S, I> {
     fn index_mut(&mut self, index: Index<S>) -> &mut Self::Output {
         &mut self.0[index.index as usize]
     }
@@ -164,44 +145,10 @@ impl<S: Sentinels> Index<S> {
 mod derive {
     macro_rules! Sentinels {
         derive() (
-            $(#[$($attr:tt)*])* $vis:vis enum $name:ident {}
-        ) => {
-            // Check that the enum has size `0`.
-            const _: () = ::core::assert!(::core::mem::size_of::<$name>() == 0);
-            // Check that the enum has no variant, i.e. the enum is not
-            // inhabited.
-            const _: () = {
-                let _ = |value: $name| match value {};
-            };
-
-            impl $crate::key_vec::EmptySentinel for $name { }
-
-            impl $crate::key_vec::Sentinels for $name {
-                fn from_index(
-                    index: $crate::key_vec::Index<Self>,
-                ) -> ::core::option::Option<Self> {
-                    ::core::option::Option::None
-                }
-
-                fn to_index(self) -> $crate::key_vec::Index<Self> {
-                    match self {}
-                }
-            }
-
-            impl ::core::fmt::Debug for $crate::key_vec::Index<$name> {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    f.debug_tuple(stringify!($name)).field(&self.as_u32()).finish()
-                }
-            }
-        };
-
-        derive() (
             $(#[$($attr:tt)*])* $vis:vis enum $name:ident {
                 $($variant:ident $(= $value:expr)?),* $(,)?
             }
         ) => {
-            impl $crate::key_vec::NonEmptySentinel for $name {}
-
             impl $crate::key_vec::Sentinels for $name {
                 fn from_index(
                     index: $crate::key_vec::Index<Self>,
