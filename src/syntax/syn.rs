@@ -1,97 +1,121 @@
-use crate::{
-    key_vec::{Index, KeyVec, Sentinels},
-    token::Token,
-};
+use crate::key_vec::{Index, KeyVec, Sentinels, SharedIndex};
 
-#[derive(Debug)]
-pub enum SynData {
-    // TODO: Find a solution to avoid nested allocation from the [`Vec<Syn>`],
-    // maybe reference a range of syns (with a start and a length) in the main
-    // vector.
-    Root(Vec<Syn>),
-    Ident(Token),
-    False(Token),
-    True(Token),
-    Number(Token),
-    Equal(Syn, Syn),
-    Add(Syn, Syn),
-    Subtract(Syn, Syn),
-    Multiply(Syn, Syn),
-    Divide(Syn, Syn),
-    // TODO: Maybe binding should only hold one syn that can be either a
-    // pattern or an assignement?
-    Binding {
-        pattern: Syn,
-        value: Syn,
-    },
-    Mut {
-        pattern: Syn,
-    },
-    Assignment {
-        pattern: Syn,
-        value: Syn,
-    },
-    Function {
-        pattern: Syn,
-        body: Syn,
-    },
-    ReturnAscription {
-        syn: Syn,
-        type_: Syn,
-    },
-    Ascription {
-        syn: Syn,
-        type_: Syn,
-    },
-    Access {
-        syn: Syn,
-        key: Syn,
-    },
-    EmptyParen(Token),
-    Paren(Syn),
-    EmptyCurly(Token),
-    Curly(Syn),
-    // TODO: Find a solution to avoid nested allocation from the [`Vec<Syn>`],
-    // maybe reference a range of syns (with a start and a length) in the main
-    // vector.
-    Tuple(Vec<Syn>),
-    Application {
-        function: Syn,
-        argument: Syn,
-    },
-    Loop(Syn),
-    Match(Syn),
-    If {
-        condition: Syn,
-        then: Syn,
-    },
-    IfElse {
-        condition: Syn,
-        then: Syn,
-        else_: Syn,
-    },
-    // TODO: Find a solution to avoid nested allocation from the [`Vec<Syn>`],
-    // maybe reference a range of syns (with a start and a length) in the main
-    // vector.
-    ChainOpen(Vec<Syn>),
-    // TODO: Find a solution to avoid nested allocation from the [`Vec<Syn>`],
-    // maybe reference a range of syns (with a start and a length) in the main
-    // vector.
-    ChainClosed(Vec<Syn>),
-    // TODO: Find a solution to avoid nested allocation.
-    String(Vec<StringSegment>),
-}
-
-#[derive(Debug)]
-pub enum StringSegment {
-    Token(Token),
-    Interpolation(Syn),
+#[derive(Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SynKind {
+    // lhs: syn | none -- statement, lhs is only none if the tree is empty
+    // rhs: syn.root | none -- next
+    Root,
+    // lhs: token.ident
+    Ident,
+    // lhs: token.false
+    False,
+    // lhs: token.true
+    True,
+    // lhs: token.number
+    Number,
+    // lhs: syn
+    // rhs: syn
+    Equal,
+    // lhs: syn
+    // rhs: syn
+    Add,
+    // lhs: syn
+    // rhs: syn
+    Subtract,
+    // lhs: syn
+    // rhs: syn
+    Multiply,
+    // lhs: syn
+    // rhs: syn
+    Divide,
+    // lhs: syn -- pattern
+    // rhs: syn -- value
+    Binding,
+    // lhs: token.mut
+    Mut,
+    // lhs: syn -- pattern
+    // rhs: syn -- value
+    Assignment,
+    // lhs: syn -- pattern
+    // rhs: syn -- body
+    Function,
+    // lhs: syn
+    // rhs: syn -- return type
+    ReturnAscription,
+    // lhs: syn
+    // rhs: syn -- type
+    Ascription,
+    // lhs: syn
+    // rhs: syn -- key
+    Access,
+    // lhs: token.left_paren
+    // rhs: syn | syn.none
+    Paren,
+    // lhs: token.left_curly
+    // lhs: syn | syn.none
+    Curly,
+    // lhs: syn -- field
+    // rhs: syn | syn.tuple | none -- next, the tuple is closed if the last rhs is none.
+    Tuple,
+    // lhs: syn -- callee
+    // rhs: syn -- argument
+    Application,
+    // lhs: syn
+    Loop,
+    // lhs: syn
+    Match,
+    // lhs: syn -- condition
+    // rhs: syn | syn.else -- then block or syn.else which contains the then block and the else block
+    If,
+    // lhs: syn -- then block
+    // rhs: syn -- else block
+    Else,
+    // lhs: syn -- field
+    // rhs: syn | syn.chain | none -- next, the chain is closed if the last rhs is none.
+    Chain,
+    // lhs: token.string_start
+    // rhs: syn.string_interpolation | syn.string_segment | none -- next
+    String,
+    // lhs: token.string_segment
+    // rhs: syn.string_interpolation | none -- next
+    StringSegment,
+    // lhs: syn
+    // rhs: syn.string_segment | none -- next
+    StringInterpolation,
 }
 
 #[derive(Sentinels, Clone, Copy, Debug)]
-pub enum SynSentinel {}
+#[repr(u32)]
+pub enum SynSentinel {
+    None = u32::MAX,
+}
+
+#[derive(Default)]
+pub struct Syntax {
+    pub kinds: KeyVec<SynSentinel, SynKind>,
+    pub lhs: KeyVec<SynSentinel, SharedIndex>,
+    pub rhs: KeyVec<SynSentinel, SharedIndex>,
+}
+
+impl Syntax {
+    pub fn push(
+        &mut self,
+        kind: SynKind,
+        lhs: impl Into<SharedIndex>,
+        rhs: impl Into<SharedIndex>,
+    ) -> Syn {
+        let syn = self.kinds.push(kind);
+        let lhs_syn = self.lhs.push(lhs.into());
+        let rhs_syn = self.rhs.push(rhs.into());
+
+        debug_assert_eq!(syn, lhs_syn);
+        debug_assert_eq!(syn, rhs_syn);
+
+        syn
+    }
+}
 
 pub type Syn = Index<SynSentinel>;
-pub type Syntax = KeyVec<SynSentinel, SynData>;
 
 pub const ROOT_SYN: Syn = Syn::from_u32_index(0);

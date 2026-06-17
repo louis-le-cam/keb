@@ -5,7 +5,7 @@ use crate::{
         Sentinels,
         Value::{Item, Sentinel},
     },
-    semantic::{self, Sem, SemKind, Semantic, TypeData, TypeSentinel, Types},
+    semantic::{ROOT_SEM, Sem, SemKind, Semantic, TypeData, TypeSentinel, Types},
     token::{self, TokenOffsets},
 };
 
@@ -40,7 +40,7 @@ struct Generator<'a> {
 
 impl Generator<'_> {
     fn generate_module(&mut self) {
-        let SemKind::Module { bindings } = &self.semantic.kinds[semantic::ROOT_SEM] else {
+        let SemKind::Module { bindings } = &self.semantic.kinds[ROOT_SEM] else {
             panic!();
         };
 

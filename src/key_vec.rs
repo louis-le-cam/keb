@@ -16,7 +16,7 @@
 //! The `S` must implements the [`Sentinel`] trait, you should implement that
 //! trait using the associated derive-macro.
 
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{any::TypeId, fmt::Debug, hash::Hash, marker::PhantomData};
 
 pub struct KeyVec<S: Sentinels, I>(Vec<I>, PhantomData<S>);
 
@@ -26,7 +26,7 @@ pub enum Value<S, I> {
     Item(I),
 }
 
-pub trait Sentinels: Sized + Clone + Copy {
+pub trait Sentinels: Sized + Clone + Copy + 'static {
     fn from_index(index: Index<Self>) -> Option<Self>;
 
     fn to_index(self) -> Index<Self>;
@@ -36,6 +36,13 @@ pub trait Sentinels: Sized + Clone + Copy {
 pub struct Index<S: Sentinels> {
     index: u32,
     __phantom_data: PhantomData<S>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SharedIndex {
+    index: u32,
+    #[cfg(debug_assertions)]
+    sentinel: TypeId,
 }
 
 impl<S: Sentinels, I> KeyVec<S, I> {
@@ -139,6 +146,32 @@ impl<S: Sentinels> Index<S> {
 
     pub fn sentinel(self) -> Option<S> {
         S::from_index(self)
+    }
+}
+
+impl<S: Sentinels> From<Index<S>> for SharedIndex {
+    fn from(value: Index<S>) -> Self {
+        Self {
+            index: value.index,
+            sentinel: TypeId::of::<S>(),
+        }
+    }
+}
+
+impl SharedIndex {
+    pub const fn as_u32(self) -> u32 {
+        self.index
+    }
+}
+
+impl<S: Sentinels> From<SharedIndex> for Index<S> {
+    fn from(value: SharedIndex) -> Self {
+        debug_assert_eq!(value.sentinel, TypeId::of::<S>());
+
+        Self {
+            index: value.index,
+            __phantom_data: PhantomData,
+        }
     }
 }
 

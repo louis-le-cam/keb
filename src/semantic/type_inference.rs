@@ -5,7 +5,9 @@ use crate::{
         Sentinels,
         Value::{Item, Sentinel},
     },
-    semantic::{self, Sem, SemKind, Semantic, Type, TypeData, TypeSentinel, Types, combine_types},
+    semantic::{
+        ROOT_SEM, Sem, SemKind, Semantic, Type, TypeData, TypeSentinel, Types, combine_types,
+    },
 };
 
 pub fn infer_types(semantic: &mut Semantic, types: &mut Types) {
@@ -58,7 +60,7 @@ impl Inferrer<'_> {
             scope.insert(name.to_string(), ScopeItem::Type(binary_function_type));
         }
 
-        self.infer_expression(&scope, semantic::ROOT_SEM);
+        self.infer_expression(&scope, ROOT_SEM);
     }
 
     fn add_type(&mut self, sem: Sem, type_: Type) {

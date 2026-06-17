@@ -3,7 +3,10 @@ use std::fmt::Debug;
 use colored::{ColoredString, Colorize};
 use unicode_width::UnicodeWidthStr;
 
-use crate::syntax::{ROOT_SYN, StringSegment, Syn, SynData, Syntax};
+use crate::{
+    key_vec::Value::{Item, Sentinel},
+    syntax::{ROOT_SYN, Syn, SynKind, SynSentinel, Syntax},
+};
 
 pub fn debug(syntax: &Syntax) {
     println!("{:#?}", ROOT_SYN.debug(syntax));
@@ -26,61 +29,173 @@ fn debug_compact_wrapping(debug: impl Debug) -> impl Debug {
 impl Syn {
     pub fn debug(self, syntax: &Syntax) -> impl Debug {
         debug_compact_wrapping(std::fmt::from_fn(move |f| {
-            let (name, fields): (ColoredString, &[Syn]) = match &syntax[self] {
-                SynData::Root(syns) => ("root".bright_green(), syns.as_slice()),
-                SynData::Ident(_) => ("ident".bright_cyan(), &[]),
-                SynData::False(_) => ("false".bright_purple(), &[]),
-                SynData::True(_) => ("true".bright_purple(), &[]),
-                SynData::Number(_) => ("number".bright_purple(), &[]),
-                SynData::Equal(lhs, rhs) => ("equal".bright_yellow(), &[*lhs, *rhs]),
-                SynData::Add(lhs, rhs) => ("add".bright_yellow(), &[*lhs, *rhs]),
-                SynData::Subtract(lhs, rhs) => ("sub".bright_yellow(), &[*lhs, *rhs]),
-                SynData::Multiply(lhs, rhs) => ("mul".bright_yellow(), &[*lhs, *rhs]),
-                SynData::Divide(lhs, rhs) => ("div".bright_yellow(), &[*lhs, *rhs]),
-                SynData::Binding { pattern, value } => ("let".bright_red(), &[*pattern, *value]),
-                SynData::Mut { pattern } => ("mut".bright_red(), &[*pattern]),
-                SynData::Assignment { pattern, value } => {
-                    ("assignment".bright_yellow(), &[*pattern, *value])
+            let (name, fields): (ColoredString, &[Syn]) = match syntax.kinds[self] {
+                SynKind::Root => {
+                    let mut debug_tuple = f.debug_tuple(&"root".bright_green().to_string());
+
+                    let mut root = self;
+                    loop {
+                        assert_eq!(syntax.kinds[root], SynKind::Root);
+
+                        let Item(syn) = syntax.lhs.get(root) else {
+                            break;
+                        };
+                        let syn = Syn::from(*syn);
+                        debug_tuple.field(&syn.debug(syntax));
+
+                        let rhs = Syn::from(syntax.rhs[root]);
+                        match rhs.sentinel() {
+                            Some(SynSentinel::None) => break,
+                            None => root = rhs,
+                        };
+                    }
+
+                    return debug_tuple.finish();
                 }
-                SynData::Function { pattern, body } => {
-                    ("function".bright_green(), &[*pattern, *body])
+                SynKind::Ident => ("ident".bright_cyan(), &[]),
+                SynKind::False => ("false".bright_purple(), &[]),
+                SynKind::True => ("true".bright_purple(), &[]),
+                SynKind::Number => ("number".bright_purple(), &[]),
+                SynKind::Equal => (
+                    "equal".bright_yellow(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Add => (
+                    "add".bright_yellow(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Subtract => (
+                    "sub".bright_yellow(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Multiply => (
+                    "mul".bright_yellow(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Divide => (
+                    "div".bright_yellow(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Binding => (
+                    "let".bright_red(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Mut => ("mut".bright_red(), &[Syn::from(syntax.lhs[self])]),
+                SynKind::Assignment => (
+                    "assignment".bright_yellow(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Function => (
+                    "function".bright_green(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::ReturnAscription => (
+                    "return_ascription".white(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Ascription => (
+                    "ascription".white(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Access => (
+                    "access".white(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Paren => (
+                    "paren".white(),
+                    match Syn::from(syntax.rhs[self]).sentinel() {
+                        Some(SynSentinel::None) => &[],
+                        None => &[Syn::from(syntax.rhs[self])],
+                    },
+                ),
+                SynKind::Curly => (
+                    "curly".white(),
+                    match Syn::from(syntax.rhs[self]).sentinel() {
+                        Some(SynSentinel::None) => &[],
+                        None => &[Syn::from(syntax.rhs[self])],
+                    },
+                ),
+                SynKind::Tuple => {
+                    let mut debug_tuple = f.debug_tuple(&"tuple".white().to_string());
+
+                    let mut tuple = self;
+                    loop {
+                        assert_eq!(syntax.kinds[tuple], SynKind::Tuple);
+
+                        let Item(syn) = syntax.lhs.get(tuple) else {
+                            break;
+                        };
+                        let syn = Syn::from(*syn);
+                        debug_tuple.field(&syn.debug(syntax));
+
+                        let rhs = Syn::from(syntax.rhs[tuple]);
+                        match syntax.kinds.get(rhs) {
+                            Sentinel(SynSentinel::None) => {
+                                debug_tuple.field(&std::fmt::from_fn(|f| {
+                                    write!(f, "{}", "closed".white())
+                                }));
+                                break;
+                            }
+                            Item(SynKind::Tuple) => tuple = rhs,
+                            Item(_) => {
+                                debug_tuple.field(&rhs.debug(syntax));
+                                break;
+                            }
+                        };
+                    }
+
+                    return debug_tuple.finish();
                 }
-                SynData::ReturnAscription { syn, type_ } => {
-                    ("return_ascription".white(), &[*syn, *type_])
+                SynKind::Application => (
+                    "application".bright_green(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Loop => ("loop".bright_red(), &[Syn::from(syntax.lhs[self])]),
+                SynKind::Match => ("match".bright_red(), &[Syn::from(syntax.lhs[self])]),
+                SynKind::If => (
+                    "if".bright_red(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Else => (
+                    "else".bright_red(),
+                    &[Syn::from(syntax.lhs[self]), Syn::from(syntax.rhs[self])],
+                ),
+                SynKind::Chain => {
+                    let mut debug_tuple = f.debug_tuple(&"chain".white().to_string());
+
+                    let mut chain = self;
+                    loop {
+                        assert_eq!(syntax.kinds[chain], SynKind::Chain);
+
+                        let Item(syn) = syntax.lhs.get(chain) else {
+                            break;
+                        };
+                        let syn = Syn::from(*syn);
+                        debug_tuple.field(&syn.debug(syntax));
+
+                        let rhs = Syn::from(syntax.rhs[chain]);
+                        match syntax.kinds.get(rhs) {
+                            Sentinel(SynSentinel::None) => {
+                                debug_tuple.field(&std::fmt::from_fn(|f| {
+                                    write!(f, "{}", "closed".white())
+                                }));
+                                break;
+                            }
+                            Item(SynKind::Chain) => chain = rhs,
+                            Item(_) => {
+                                debug_tuple.field(&rhs.debug(syntax));
+                                break;
+                            }
+                        };
+                    }
+
+                    return debug_tuple.finish();
                 }
-                SynData::Ascription { syn, type_ } => ("ascription".white(), &[*syn, *type_]),
-                SynData::Access { syn, key } => ("access".white(), &[*syn, *key]),
-                SynData::EmptyParen(_) => ("empty_paren".white(), &[]),
-                SynData::Paren(expr) => ("paren".white(), &[*expr]),
-                SynData::EmptyCurly(_) => ("empty_curly".white(), &[]),
-                SynData::Curly(expr) => ("curly".white(), &[*expr]),
-                SynData::Tuple(syns) => ("tuple".white(), syns.as_slice()),
-                SynData::Application { function, argument } => {
-                    ("application".bright_green(), &[*function, *argument])
+                SynKind::String => {
+                    todo!("Implement string syntax debug pretty-print")
                 }
-                SynData::Loop(body) => ("loop".bright_red(), &[*body]),
-                SynData::Match(content) => ("match".bright_red(), &[*content]),
-                SynData::If { condition, then } => ("if".bright_red(), &[*condition, *then]),
-                SynData::IfElse {
-                    condition,
-                    then,
-                    else_,
-                } => ("if_else".bright_red(), &[*condition, *then, *else_]),
-                SynData::ChainOpen(syns) => ("chain_open".white(), syns.as_slice()),
-                SynData::ChainClosed(syns) => ("chain_closed".white(), syns.as_slice()),
-                SynData::String(segments) => {
-                    return segments
-                        .iter()
-                        .fold(
-                            &mut f.debug_tuple(&"chain_closed".white().to_string()),
-                            |tuple, segment| match segment {
-                                StringSegment::Token(token) => tuple.field(&token),
-                                StringSegment::Interpolation(syn) => {
-                                    tuple.field(&syn.debug(syntax))
-                                }
-                            },
-                        )
-                        .finish();
+                SynKind::StringSegment | SynKind::StringInterpolation => {
+                    unreachable!()
                 }
             };
 

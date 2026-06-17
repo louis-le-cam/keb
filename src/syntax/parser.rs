@@ -1,7 +1,8 @@
 use std::iter::Peekable;
 
 use crate::{
-    syntax::{self, StringSegment, Syn, SynData, Syntax},
+    key_vec::Sentinels,
+    syntax::{ROOT_SYN, Syn, SynKind, SynSentinel, Syntax},
     token::{Token, TokenKind, TokenKinds},
 };
 
@@ -26,21 +27,35 @@ struct Parser<I: Iterator<Item = (Token, TokenKind)>> {
 
 impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
     fn parse_root(&mut self) {
-        let root = self.syntax.push(SynData::Root(Vec::new()));
-        assert_eq!(root, syntax::ROOT_SYN);
+        let mut root = self.syntax.push(
+            SynKind::Root,
+            SynSentinel::None.to_index(),
+            SynSentinel::None.to_index(),
+        );
+        assert_eq!(root, ROOT_SYN);
 
-        let syns = std::iter::from_fn(|| {
+        loop {
             while self
                 .tokens
                 .next_if(|(_, token)| matches!(token, TokenKind::Semicolon))
                 .is_some()
             {}
 
-            self.parse_tuple()
-        })
-        .collect();
+            let Some(statement) = self.parse_tuple() else {
+                break;
+            };
 
-        self.syntax[root] = SynData::Root(syns);
+            match Syn::from(self.syntax.lhs[root]).sentinel() {
+                Some(SynSentinel::None) => self.syntax.lhs[root] = statement.into(),
+                None => {
+                    let new_root =
+                        self.syntax
+                            .push(SynKind::Root, statement, SynSentinel::None.to_index());
+                    self.syntax.rhs[root] = new_root.into();
+                    root = new_root;
+                }
+            }
+        }
     }
 
     fn parse_chain(&mut self) -> Option<Syn> {
@@ -52,25 +67,29 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         self.tokens.next();
 
-        let mut syns = vec![syn];
+        let chain = self
+            .syntax
+            .push(SynKind::Chain, syn, SynSentinel::None.to_index());
+        let mut chain_current = chain;
 
-        let closed = loop {
-            match self.parse_assignment() {
-                Some(syn) => syns.push(syn),
-                None => break true,
-            };
-
+        while let Some(syn) = self.parse_assignment() {
             match self.tokens.peek() {
-                Some((_, TokenKind::Semicolon)) => self.tokens.next(),
-                _ => break false,
+                Some((_, TokenKind::Semicolon)) => {
+                    self.tokens.next();
+                    let new_chain =
+                        self.syntax
+                            .push(SynKind::Chain, syn, SynSentinel::None.to_index());
+                    self.syntax.rhs[chain_current] = new_chain.into();
+                    chain_current = new_chain;
+                }
+                _ => {
+                    self.syntax.rhs[chain_current] = syn.into();
+                    break;
+                }
             };
-        };
+        }
 
-        Some(self.syntax.push(if closed {
-            SynData::ChainClosed(syns)
-        } else {
-            SynData::ChainOpen(syns)
-        }))
+        Some(chain)
     }
 
     fn parse_assignment(&mut self) -> Option<Syn> {
@@ -84,7 +103,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         let value = self.parse_tuple().unwrap();
 
-        Some(self.syntax.push(SynData::Assignment { pattern, value }))
+        Some(self.syntax.push(SynKind::Assignment, pattern, value))
     }
 
     fn parse_tuple(&mut self) -> Option<Syn> {
@@ -96,20 +115,29 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         self.tokens.next();
 
-        let mut syns = vec![syn];
+        let tuple = self
+            .syntax
+            .push(SynKind::Tuple, syn, SynSentinel::None.to_index());
+        let mut tuple_current = tuple;
 
         while let Some(syn) = self.parse_function() {
-            syns.push(syn);
-
             match self.tokens.peek() {
                 Some((_, TokenKind::Comma)) => {
                     self.tokens.next();
+                    let new_tuple =
+                        self.syntax
+                            .push(SynKind::Tuple, syn, SynSentinel::None.to_index());
+                    self.syntax.rhs[tuple_current] = new_tuple.into();
+                    tuple_current = new_tuple;
                 }
-                _ => break,
+                _ => {
+                    self.syntax.rhs[tuple_current] = syn.into();
+                    break;
+                }
             };
         }
 
-        Some(self.syntax.push(SynData::Tuple(syns)))
+        Some(tuple)
     }
 
     fn parse_function(&mut self) -> Option<Syn> {
@@ -119,7 +147,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             Some((_, TokenKind::EqualGreater)) => {
                 self.tokens.next();
                 let body = self.parse_function().unwrap();
-                self.syntax.push(SynData::Function { pattern: syn, body })
+                self.syntax.push(SynKind::Function, syn, body)
             }
             _ => syn,
         })
@@ -132,7 +160,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             Some((_, TokenKind::HyphenGreater)) => {
                 self.tokens.next();
                 let type_ = self.parse_return_ascription().unwrap();
-                self.syntax.push(SynData::ReturnAscription { syn, type_ })
+                self.syntax.push(SynKind::ReturnAscription, syn, type_)
             }
             _ => syn,
         })
@@ -142,10 +170,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         let syn = self.parse_comparative()?;
 
         Some(match self.parse_application() {
-            Some(argument) => self.syntax.push(SynData::Application {
-                function: syn,
-                argument,
-            }),
+            Some(argument) => self.syntax.push(SynKind::Application, syn, argument),
             None => syn,
         })
     }
@@ -156,7 +181,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         while let Some((_, TokenKind::DoubleEqual)) = self.tokens.peek() {
             self.tokens.next();
             let rhs = self.parse_comparative().unwrap();
-            syn = self.syntax.push(SynData::Equal(syn, rhs))
+            syn = self.syntax.push(SynKind::Equal, syn, rhs)
         }
 
         Some(syn)
@@ -170,12 +195,12 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 Some((_, TokenKind::Plus)) => {
                     self.tokens.next();
                     let rhs = self.parse_multiplicative().unwrap();
-                    syn = self.syntax.push(SynData::Add(syn, rhs))
+                    syn = self.syntax.push(SynKind::Add, syn, rhs)
                 }
                 Some((_, TokenKind::Hyphen)) => {
                     self.tokens.next();
                     let rhs = self.parse_multiplicative().unwrap();
-                    syn = self.syntax.push(SynData::Subtract(syn, rhs))
+                    syn = self.syntax.push(SynKind::Subtract, syn, rhs)
                 }
                 _ => break,
             }
@@ -192,12 +217,12 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
                 Some((_, TokenKind::Star)) => {
                     self.tokens.next();
                     let rhs = self.parse_ascription().unwrap();
-                    syn = self.syntax.push(SynData::Multiply(syn, rhs))
+                    syn = self.syntax.push(SynKind::Multiply, syn, rhs)
                 }
                 Some((_, TokenKind::Slash)) => {
                     self.tokens.next();
                     let rhs = self.parse_ascription().unwrap();
-                    syn = self.syntax.push(SynData::Divide(syn, rhs))
+                    syn = self.syntax.push(SynKind::Divide, syn, rhs)
                 }
                 _ => break,
             }
@@ -213,7 +238,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             Some((_, TokenKind::Colon)) => {
                 self.tokens.next();
                 let type_ = self.parse_ascription().unwrap();
-                self.syntax.push(SynData::Ascription { syn, type_ })
+                self.syntax.push(SynKind::Ascription, syn, type_)
             }
             _ => syn,
         })
@@ -225,7 +250,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         while let Some((_, TokenKind::Dot)) = self.tokens.peek() {
             self.tokens.next();
             let key = self.parse_terminal().unwrap();
-            syn = self.syntax.push(SynData::Access { syn, key });
+            syn = self.syntax.push(SynKind::Access, syn, key);
         }
 
         Some(syn)
@@ -239,32 +264,38 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
             TokenKind::Number => {
                 self.tokens.next();
-                self.syntax.push(SynData::Number(token))
+                self.syntax
+                    .push(SynKind::Number, token, SynSentinel::None.to_index())
             }
             TokenKind::Ident => {
                 self.tokens.next();
-                self.syntax.push(SynData::Ident(token))
+                self.syntax
+                    .push(SynKind::Ident, token, SynSentinel::None.to_index())
             }
             TokenKind::Let => self.parse_let(),
             TokenKind::Mut => {
                 self.tokens.next();
                 let pattern = self.parse_return_ascription().unwrap();
-                self.syntax.push(SynData::Mut { pattern })
+                self.syntax
+                    .push(SynKind::Mut, pattern, SynSentinel::None.to_index())
             }
             TokenKind::Loop => {
                 self.tokens.next();
                 let body = self.parse_application().unwrap();
-                self.syntax.push(SynData::Loop(body))
+                self.syntax
+                    .push(SynKind::Loop, body, SynSentinel::None.to_index())
             }
             TokenKind::Match => self.parse_match(),
             TokenKind::If => self.parse_if(),
             TokenKind::False => {
                 self.tokens.next();
-                self.syntax.push(SynData::False(token))
+                self.syntax
+                    .push(SynKind::False, token, SynSentinel::None.to_index())
             }
             TokenKind::True => {
                 self.tokens.next();
-                self.syntax.push(SynData::True(token))
+                self.syntax
+                    .push(SynKind::True, token, SynSentinel::None.to_index())
             }
 
             TokenKind::StringStart => self.parse_string(),
@@ -305,8 +336,10 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         };
 
         match expr {
-            Some(expr) => self.syntax.push(SynData::Paren(expr)),
-            None => self.syntax.push(SynData::EmptyParen(token)),
+            Some(expr) => self.syntax.push(SynKind::Paren, token, expr),
+            None => self
+                .syntax
+                .push(SynKind::Paren, token, SynSentinel::None.to_index()),
         }
     }
 
@@ -322,8 +355,10 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
         };
 
         match expr {
-            Some(expr) => self.syntax.push(SynData::Curly(expr)),
-            None => self.syntax.push(SynData::EmptyCurly(token)),
+            Some(expr) => self.syntax.push(SynKind::Curly, token, expr),
+            None => self
+                .syntax
+                .push(SynKind::Curly, token, SynSentinel::None.to_index()),
         }
     }
 
@@ -340,7 +375,7 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         let value = self.parse_tuple().unwrap();
 
-        self.syntax.push(SynData::Binding { pattern, value })
+        self.syntax.push(SynKind::Binding, pattern, value)
     }
 
     fn parse_match(&mut self) -> Syn {
@@ -350,7 +385,8 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
 
         let content = self.parse_curly();
 
-        self.syntax.push(SynData::Match(content))
+        self.syntax
+            .push(SynKind::Match, content, SynSentinel::None.to_index())
     }
 
     fn parse_if(&mut self) -> Syn {
@@ -371,41 +407,56 @@ impl<I: Iterator<Item = (Token, TokenKind)>> Parser<I> {
             .next_if(|(_, token)| *token == TokenKind::Else)
             .is_none()
         {
-            self.syntax.push(SynData::If { condition, then })
+            self.syntax.push(SynKind::If, condition, then)
         } else {
             let else_ = self.parse_application().unwrap();
-
-            self.syntax.push(SynData::IfElse {
-                condition,
-                then,
-                else_,
-            })
+            let else_syn = self.syntax.push(SynKind::Else, then, else_);
+            self.syntax.push(SynKind::If, condition, else_syn)
         }
     }
 
     fn parse_string(&mut self) -> Syn {
-        let Some((_, TokenKind::StringStart)) = self.tokens.next() else {
+        let Some((token, TokenKind::StringStart)) = self.tokens.next() else {
             panic!()
         };
 
-        let mut segments = Vec::new();
+        let string = self
+            .syntax
+            .push(SynKind::String, token, SynSentinel::None.to_index());
 
+        let mut string_current = string;
         loop {
             let (token, token_kind) = self.tokens.next().unwrap();
             match token_kind {
                 TokenKind::StringSegment | TokenKind::StringEscape => {
-                    segments.push(StringSegment::Token(token))
+                    let segment = self.syntax.push(
+                        SynKind::StringSegment,
+                        token,
+                        SynSentinel::None.to_index(),
+                    );
+                    self.syntax.rhs[string_current] = segment.into();
+                    string_current = segment;
                 }
                 TokenKind::InterpolationStart => {
-                    segments.push(StringSegment::Interpolation(self.parse_chain().unwrap()));
+                    let expression = self.parse_chain().unwrap();
+
+                    let interpolation = self.syntax.push(
+                        SynKind::StringInterpolation,
+                        expression,
+                        SynSentinel::None.to_index(),
+                    );
+                    self.syntax.rhs[string_current] = interpolation.into();
+                    string_current = interpolation;
 
                     let Some((_, TokenKind::InterpolationEnd)) = self.tokens.next() else {
                         panic!();
                     };
                 }
-                TokenKind::StringEnd => break self.syntax.push(SynData::String(segments)),
+                TokenKind::StringEnd => break,
                 _ => panic!(),
             }
         }
+
+        string
     }
 }
