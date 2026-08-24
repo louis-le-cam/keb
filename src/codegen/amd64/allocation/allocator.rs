@@ -224,6 +224,10 @@ impl Allocator<'_> {
     }
 
     fn allocate(&self, inst: Inst, size: u64) -> Allocation {
+        if size == 0 {
+            return Allocation::Unit;
+        }
+
         let used_allocations = self.used_allocations(inst);
 
         if size == 4 {
