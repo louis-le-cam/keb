@@ -63,7 +63,7 @@ impl Allocator<'_> {
             Sentinel(sentinel) => match sentinel {
                 TypeSentinel::Unknown => panic!(),
                 TypeSentinel::Unit => Allocation::Unit,
-                TypeSentinel::Uint32 => Allocation::Eax,
+                TypeSentinel::Uint32 => Allocation::Edi,
                 TypeSentinel::Bool | TypeSentinel::False | TypeSentinel::True => todo!(),
             },
             Item(_) => todo!(),
