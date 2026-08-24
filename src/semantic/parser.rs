@@ -200,7 +200,7 @@ impl Parser<'_> {
                 });
 
                 let curly = Syn::from(self.syntax.lhs[i]);
-                let reversed_arms = self.parse_match_body(curly).rev();
+                let reversed_arms = self.parse_match_body(curly);
 
                 let param = self.push(SemKind::Reference {
                     name: "__param".to_string(),
@@ -300,7 +300,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_match_body(&mut self, syn: Syn) -> Box<dyn DoubleEndedIterator<Item = (Syn, Syn)>> {
+    fn parse_match_body(&mut self, syn: Syn) -> Box<dyn Iterator<Item = (Syn, Syn)>> {
         match self.syntax.kinds[syn] {
             SynKind::Curly => {
                 let content = Syn::from(self.syntax.rhs[syn]);
