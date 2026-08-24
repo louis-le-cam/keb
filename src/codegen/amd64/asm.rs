@@ -347,14 +347,8 @@ impl Generator<'_> {
                 inst_asm.push_str("  push %rdx\n");
                 inst_asm.push_str("  push %rsi\n");
 
-                let (argument_type, return_type) = match self.ssa.blocks[*function] {
-                    BlockData::ExternFunction { arg, ret, .. }
-                    | BlockData::Function { arg, ret, .. } => (arg, ret),
-                    BlockData::Block { .. } => panic!(),
-                };
-
                 let (argument_allocation, return_allocation) =
-                    self.other_function_allocations(argument_type, return_type, stack_size);
+                    self.other_function_allocations(*function, stack_size);
 
                 let allocation = self.expr_allocation(*argument);
                 inst_asm.push_str(&allocation.move_to(&argument_allocation));
@@ -461,33 +455,26 @@ impl Generator<'_> {
 
     fn other_function_allocations(
         &self,
-        argument_type: Type,
-        return_type: Type,
+        function: Block,
         stack_size: u64,
     ) -> (Allocation, Allocation) {
-        let argument_size = self.type_size(argument_type);
-        let return_size = self.type_size(return_type);
+        let argument_allocation = match self.allocations.arguments[function] {
+            Allocation::StackArgument { offset: _, size } => Allocation::Stack {
+                // TEMP: This magic `40` corresponds to the size of the
+                // registers we push on the stack before calling a function.
+                offset: stack_size + size + 40,
+                size,
+            },
+            Allocation::Stack { .. } => panic!(),
+            allocation => allocation,
+        };
 
-        (
-            match argument_size {
-                0 => Allocation::Unit,
-                4 => Allocation::Esi,
-                size => Allocation::Stack {
-                    // TEMP: This magic `40` corresponds to the size of the
-                    // registers we push on the stack before calling a function.
-                    offset: stack_size + size + 40,
-                    size,
-                },
-            },
-            match return_size {
-                0 => Allocation::Unit,
-                4 => Allocation::Edi,
-                size => Allocation::Stack {
-                    offset: stack_size + argument_size,
-                    size,
-                },
-            },
-        )
+        let return_allocation = match self.allocations.arguments[function] {
+            Allocation::Stack { .. } => todo!(),
+            allocation => allocation,
+        };
+
+        (argument_allocation, return_allocation)
     }
 
     #[track_caller]
